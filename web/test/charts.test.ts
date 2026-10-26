@@ -138,22 +138,23 @@ describe('corners', () => {
     const base: CompareChartInput = {slots: [], metric: 'speed', axis: 'dist', lapView: 'last', window: 20, trackLength: 3323, corners, format: 2026, hoverX: null, now: 0};
     let f = fakeContext();
     drawCompareChart(f.ctx, 852, 200, base); // 800 px of plot for 3323 m
-    expect(f.labels().filter(l => /^T/.test(l)), 'T14 and T15 are too close to T13 for their own labels').toEqual(['T1', 'T2', 'T13']);
+    expect(f.labels().filter(l => corners.some(c => c.n === l)), '14 and 15 are too close to 13 for their own labels').toEqual(['1', '2', '13']);
+    expect(f.labels().filter(l => /^T\d/.test(l)), 'plain numbers, no T prefix').toEqual([]);
     const laps: LapTraces = {lap: 9, cur: [], last: [{d: 600, speed: 90, thr: 0, brk: 1, gear: 2, ers: 0.5, mode: 1, ld: 600}], lastLap: 8, best: [], bestLap: null, bestTime: 0, invalid: false};
     f = fakeContext();
     drawCompareChart(f.ctx, 852, 200, {...base, slots: [{name: 'YOU', trail: undefined, laps}], hoverX: 44 + (610 / 3323) * 800});
-    expect(f.labels()).toContain('610 m · T2');
+    expect(f.labels()).toContain('610 m · 2');
   });
   test('time charts mark where the car went through each corner', () => {
     const now = 10000;
     let f = fakeContext();
     const pedals = [190, 205, 215, 225, 240].map((ld, i) => ({t: now - 4000 + i * 100, thr: 1, brk: 0, ld}));
     drawPedalTrace(f.ctx, 300, 80, pedals, now, {corners: CORNERS, trackLength: 3323});
-    expect(f.labels()).toEqual(['T1']);
+    expect(f.labels()).toEqual(['1']);
     // compare's live time chart: the reference driver's passes
     const trail: TimePoint[] = [600, 610, 620, 2530, 2545, 2575].map((ld, i) => ({t: now - 9000 + i * 1000, speed: 100, thr: 1, brk: 0, gear: 4, ers: 0.5, mode: 1, ld}));
     f = fakeContext();
     drawCompareChart(f.ctx, 600, 200, {slots: [{name: 'YOU', trail, laps: undefined}], metric: 'speed', axis: 'time', lapView: 'cur', window: 20, trackLength: 3323, corners: CORNERS, format: 2026, hoverX: null, now});
-    expect(f.labels().filter(l => /^T/.test(l))).toEqual(['T2', 'T13', 'T14']);
+    expect(f.labels().filter(l => CORNERS.some(c => c.n === l))).toEqual(['2', '13', '14']);
   });
 });
