@@ -1,4 +1,4 @@
-// Builds the shipped track maps (tracks/maps/<trackId>-<trackLength>.json) from recordings. Each recording is
+// Builds the shipped track maps (tracks/maps/<Track>_<trackId>-<trackLength>.json) from recordings. Each recording is
 // played through a dashboard, whose own track learning saves the outline, with its official corner numbers, once
 // a whole lap is known. Tracks that already have a shipped map are left as they are. A recording from the 2026
 // format also gives the track's overtake detection point, which goes to <out>/boost.json.
@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const {createDashboard} = require('../server');
 const {loadRecording, isRecordingName} = require('../replay');
+const {trackMapFileName, mapFileKey} = require('../build/shared');
 
 const OUT = path.join(__dirname, '..', 'tracks', 'maps');
 const quiet = {log() {}, warn() {}, error() {}};
@@ -15,7 +16,7 @@ const quiet = {log() {}, warn() {}, error() {}};
 function buildTrack(recording, {out = OUT, trackComplete} = {}) {
   const {packets} = loadRecording(recording);
   const dash = createDashboard({httpPort: 0, udpPort: 0, trackDir: out, bundledTrackDir: out, trackComplete, log: quiet});
-  const had = new Set(fs.existsSync(out) ? fs.readdirSync(out) : []);
+  const had = new Set((fs.existsSync(out) ? fs.readdirSync(out) : []).map(mapFileKey));
   let track = null,
     result = null,
     boost = null;
@@ -25,8 +26,8 @@ function buildTrack(recording, {out = OUT, trackComplete} = {}) {
     const s = dash.refreshState();
     if (s.session) track = s.session.track;
     if (s.trackMap && s.trackMap.available && !result) {
-      const name = `${s.trackMap.trackId}-${s.trackMap.trackLength}.json`;
-      result = had.has(name) ? {track, skipped: 'already has a map'} : {track, file: path.join(out, name)};
+      const {trackId, trackLength} = s.trackMap;
+      result = had.has(`${trackId}-${trackLength}`) ? {track, skipped: 'already has a map'} : {track, file: path.join(out, trackMapFileName(track, trackId, trackLength))};
     }
     if (s.trackMap && s.trackMap.boost != null) boost = s.trackMap.boost;
     if (result && boost != null) break; // (the detection point is learned when the countdown starts, usually in the first lap)

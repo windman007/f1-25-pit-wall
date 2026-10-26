@@ -6,7 +6,7 @@ const {WebSocketServer} = require('ws');
 const {F1TelemetryClient, constants} = require('./build/src');
 const {StrategyTracker} = require('./strategy');
 const {loadRecording, createPlayer, createRecordingWriter, readHeader, isRecordingName, REC_EXT, HEADER_BYTES} = require('./replay');
-const {overtakeOn, createHistory, recordHistory, historySnapshot, learnTrack, outlineComplete, outlinePoints, fitCorners, recordingName} = require('./build/shared');
+const {overtakeOn, createHistory, recordHistory, historySnapshot, learnTrack, outlineComplete, outlinePoints, fitCorners, recordingName, trackMapFileName, mapFileKey} = require('./build/shared');
 
 const {PACKETS, TRACKS, TEAMS} = constants;
 // the React page, built by `npm run build:web` (web/ -> web/dist)
@@ -544,7 +544,7 @@ function createDashboard(options = {}) {
 
   // --- Track maps: shipped outlines (bundledTrackDir), else learned from the cars and saved to trackDir the first
   // time a whole lap is known, so a track the dashboard has seen once shows at once from then on. Corners get their
-  // official numbers by fitting the official circuit data onto the outline. Files: <trackId>-<trackLength>.json ---
+  // official numbers by fitting the official circuit data onto the outline. Files: <Track>_<trackId>-<trackLength>.json ---
   let official = null;
   const officialData = () => {
     if (!official) {
@@ -556,13 +556,24 @@ function createDashboard(options = {}) {
     }
     return official;
   };
+  // the map file for a track key in dir, named after the track ('Silverstone_7-5890.json') or, as before, just the key
+  const mapFileIn = (dir, key) => {
+    let names = [];
+    try {
+      names = fs.readdirSync(dir);
+    } catch (err) {
+      // no such folder yet
+    }
+    const name = names.find(n => mapFileKey(n) === key);
+    return name ? path.join(dir, name) : null;
+  };
   const outlines = {key: null, track: new Map(), found: new Map(), failed: null}; // found: key -> {file, at}
   const trackKey = se => (se && Number.isInteger(se.trackId) && se.trackId >= 0 && se.trackLength > 0 ? `${se.trackId}-${se.trackLength}` : null);
   // the outline file for a track (learned first, then shipped), or null; a miss is looked up again after a second
   function outlineFile(key) {
     const hit = outlines.found.get(key);
     if (hit && (hit.file || Date.now() - hit.at < 1000)) return hit.file;
-    const file = [path.join(trackDir, key + '.json'), path.join(bundledTrackDir, key + '.json')].find(f => fs.existsSync(f)) || null;
+    const file = [trackDir, bundledTrackDir].map(dir => mapFileIn(dir, key)).find(Boolean) || null;
     outlines.found.set(key, {file, at: Date.now()});
     return file;
   }
@@ -630,7 +641,7 @@ function createDashboard(options = {}) {
     if (!outlineComplete(outlines.track, se.trackLength, trackComplete)) return;
     const points = outlinePoints(outlines.track, se.trackLength);
     const data = {trackId: se.trackId, name: se.track, trackLength: se.trackLength, points, corners: fitCorners(points, officialData()[se.trackId])};
-    const file = path.join(trackDir, key + '.json');
+    const file = path.join(trackDir, trackMapFileName(se.track, se.trackId, se.trackLength));
     try {
       fs.mkdirSync(trackDir, {recursive: true});
       fs.writeFileSync(file + '.tmp', JSON.stringify(data));
