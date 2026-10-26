@@ -1,6 +1,6 @@
 // Canvas drawing as pure functions: called with a fake 2D context that logs every call.
 import {describe, expect, test} from 'vitest';
-import type {DistPoint, LapTraces, TimePoint} from '@shared';
+import type {DistPoint, LapTraces, Motion, TimePoint} from '@shared';
 import {drawCompareChart, type CompareChartInput} from '../src/charts/compareChart';
 import {drawPedalTrace} from '../src/charts/pedalTrace';
 import {AERO_ZONE_COLOR, DRS_ZONE_COLOR, drawTrackMap} from '../src/charts/trackMap';
@@ -132,6 +132,23 @@ describe('corners', () => {
     const pos = (n: string) => f.log.find(c => c[0] === 'fillText' && c[1] === n)!.slice(2, 4) as number[];
     const [a, b] = [pos('13'), pos('14')];
     expect(Math.hypot(a[0] - b[0], a[1] - b[1]), "close corners (13, 14) don't sit on top of each other").toBeGreaterThanOrEqual(16);
+  });
+  test('the map can be turned about its centre, clockwise, and is fitted to the canvas again', () => {
+    const carAt = (rotation?: number) => {
+      const f = fakeContext();
+      drawTrackMap(f.ctx, 400, 300, {track: ring(), rivals: [], car: {x: 400, z: 0} as Motion, session: null, rotation});
+      const [, x, y] = f.log.find(c => c[0] === 'arc' && c[3] === 7)!; // the car's circle
+      return [x, y] as number[];
+    };
+    const [x0, y0] = carAt();
+    expect(x0, 'no rotation: the car is at the right end, as before').toBeGreaterThan(300);
+    expect(carAt(0)).toEqual([x0, y0]);
+    const [x90, y90] = carAt(90);
+    expect(x90, 'a quarter turn clockwise: right becomes bottom').toBeCloseTo(200, 3);
+    expect(y90).toBeGreaterThan(250);
+    const [x180, y180] = carAt(180);
+    expect([x180 + x0, y180 + y0], 'a half turn mirrors it through the centre').toEqual([400, 300].map(v => expect.closeTo(v, 3)));
+    expect(carAt(360)).toEqual([x0, y0].map(v => expect.closeTo(v, 6)));
   });
   test('the compare distance chart marks the corners; the hover names the one under the cursor', () => {
     const corners = [...CORNERS, {n: '15', d: 2580}];

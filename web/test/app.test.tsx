@@ -109,6 +109,117 @@ describe('setup overlay', () => {
   });
 });
 
+describe('spinning the track map', () => {
+  const KEY = 'pitwall-maprot-v1';
+  const onTrack = (trackId: number): DashboardState => {
+    const s = dashboardState({rivals: []});
+    return {...s, session: {...s.session!, trackId}};
+  };
+  const saved = () => JSON.parse(localStorage.getItem(KEY)!);
+  const reset = (p: Page) => p.$('.maprst');
+  const turn = (p: Page, dir: 'clockwise' | 'anticlockwise') => p.click(`[aria-label="Rotate map ${dir}"]`);
+  // a 200 x 200 canvas at the top left: its centre is (100, 100)
+  const canvas = (p: Page) => {
+    const cv = p.$<HTMLCanvasElement>('canvas.mapcv')!;
+    cv.getBoundingClientRect = () => ({left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200}) as DOMRect;
+    return cv;
+  };
+
+  test('the buttons turn the map by 15 degrees; the angle is shown and remembered', async () => {
+    const p = await boot();
+    expect(p.$<HTMLButtonElement>('[aria-label="Rotate map clockwise"]')!.disabled, 'no track yet').toBe(true);
+    p.push(onTrack(7));
+    expect(reset(p), 'not turned: nothing to reset').toBeNull();
+    turn(p, 'clockwise');
+    turn(p, 'clockwise');
+    expect(text(reset(p))).toBe('30° ✕');
+    expect(saved()).toEqual({7: 30});
+    turn(p, 'anticlockwise');
+    expect(text(reset(p))).toBe('15° ✕');
+    for (let i = 0; i < 3; i++) turn(p, 'anticlockwise');
+    expect(text(reset(p)), 'past straight up the angle wraps round, negative to the left').toBe('-30° ✕');
+    expect(saved()).toEqual({7: -30});
+    turn(p, 'clockwise');
+    turn(p, 'clockwise');
+    expect(reset(p), 'back to 0: no reset button, nothing stored').toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  test('every track has its own angle; Reset (or a double-click) turns one back', async () => {
+    const p = await boot();
+    p.push(onTrack(7));
+    turn(p, 'clockwise');
+    p.push(onTrack(4));
+    expect(reset(p), 'another track starts as the game has it').toBeNull();
+    turn(p, 'anticlockwise');
+    expect(saved()).toEqual({4: -15, 7: 15});
+    p.push(onTrack(7));
+    expect(text(reset(p))).toBe('15° ✕');
+    p.click(reset(p)!);
+    expect(saved()).toEqual({4: -15});
+    p.push(onTrack(4));
+    p.pointer(canvas(p), 'dblclick');
+    expect(reset(p)).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  test('dragging the map follows the pointer around its centre, and is stored when let go', async () => {
+    const p = await boot();
+    p.push(onTrack(7));
+    const cv = canvas(p);
+    p.pointer(cv, 'pointerdown', {clientX: 200, clientY: 100}); // right of the centre
+    p.pointer(cv, 'pointermove', {clientX: 100, clientY: 200}); // below it: a quarter turn clockwise
+    expect(text(reset(p))).toBe('90° ✕');
+    expect(localStorage.getItem(KEY), 'not stored while dragging').toBeNull();
+    p.pointer(cv, 'pointermove', {clientX: 0, clientY: 100}); // left: half a turn
+    p.pointer(cv, 'pointerup', {clientX: 0, clientY: 100});
+    expect(text(reset(p))).toBe('180° ✕');
+    expect(saved()).toEqual({7: 180});
+    // the next drag starts from where the map is now
+    p.pointer(cv, 'pointerdown', {clientX: 0, clientY: 100});
+    p.pointer(cv, 'pointermove', {clientX: 100, clientY: 0}); // left to above: a quarter turn clockwise
+    p.pointer(cv, 'pointerup', {clientX: 100, clientY: 0});
+    expect(text(reset(p))).toBe('-90° ✕');
+    expect(saved()).toEqual({7: -90});
+  });
+
+  test('a finger, a secondary button and a track not yet known do not drag the map', async () => {
+    const p = await boot();
+    const cv = canvas(p);
+    const press = (init: MouseEventInit, pointerType?: string) => {
+      const down = new MouseEvent('pointerdown', {bubbles: true, cancelable: true, clientX: 200, clientY: 100, ...init});
+      if (pointerType) Object.defineProperty(down, 'pointerType', {value: pointerType});
+      act(() => {
+        cv.dispatchEvent(down);
+      });
+      p.pointer(cv, 'pointermove', {clientX: 100, clientY: 200});
+      p.pointer(cv, 'pointerup');
+    };
+    press({}); // no session yet
+    p.push(onTrack(7));
+    press({}, 'touch'); // a finger scrolls the page instead
+    press({button: 2});
+    expect(reset(p)).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+    press({}, 'mouse');
+    expect(text(reset(p))).toBe('90° ✕');
+  });
+
+  test('a saved angle is applied on load; unusable saved values are ignored', async () => {
+    const p = await boot({storage: {[KEY]: JSON.stringify({7: -45})}});
+    p.push(onTrack(7));
+    expect(text(reset(p))).toBe('-45° ✕');
+    const q = await boot({storage: {[KEY]: JSON.stringify({7: 'x', 8: 0, 9: null, 4: 450})}});
+    q.push(onTrack(7));
+    expect(reset(q)).toBeNull();
+    q.push(onTrack(4));
+    expect(text(reset(q)), '450 is a quarter turn and a full one').toBe('90° ✕');
+    const r = await boot({storage: {[KEY]: '{oops'}});
+    r.push(onTrack(4));
+    expect(reset(r)).toBeNull();
+  });
+});
+
 describe('session header and driving', () => {
   test('track, weather and temperatures', async () => {
     const p = await boot();
