@@ -602,7 +602,7 @@ describe('track maps', () => {
     const trackDir = tmpDir(), logs = [];
     const d = learnFrom({trackDir, log: {...quiet, log: m => logs.push(m)}});
     assert.deepEqual(d.state.trackMap, {trackId: 4, trackLength: 4664, available: true, boost: null});
-    const saved = JSON.parse(fs.readFileSync(path.join(trackDir, '4-4664.json'), 'utf8'));
+    const saved = JSON.parse(fs.readFileSync(path.join(trackDir, 'Catalunya_4-4664.json'), 'utf8'));
     assert.equal(saved.name, 'Catalunya');
     assert.equal(saved.trackLength, 4664);
     assert.ok(saved.points.length > 5 && saved.points.every(p => p.length === 3));
@@ -625,6 +625,28 @@ describe('track maps', () => {
     const d = learnFrom({trackDir, bundledTrackDir});
     assert.equal(d.state.trackMap.available, true);
     assert.deepEqual(fs.readdirSync(trackDir), []);
+  });
+  test('a map is found by its track name, or by the older plain key; the learned one first', () => {
+    const bundledTrackDir = tmpDir(), trackDir = tmpDir();
+    const find = (opts = {}) => learnFrom({trackDir: tmpDir(), bundledTrackDir: tmpDir(), trackComplete: {}, ...opts}).state.trackMap.available; // (not a whole lap: nothing is learned)
+    assert.equal(find(), false, 'none anywhere');
+    fs.writeFileSync(path.join(bundledTrackDir, 'Catalunya_4-4664.json'), '{"points":[],"corners":[]}');
+    assert.equal(find({bundledTrackDir}), true, 'named after the track');
+    fs.writeFileSync(path.join(trackDir, '4-4664.json'), '{"points":[],"corners":[]}');
+    assert.equal(find({trackDir}), true, 'the older plain name');
+    const other = tmpDir();
+    fs.writeFileSync(path.join(other, 'Catalunya_14-4664.json'), '{"points":[],"corners":[]}'); // track 14, not 4
+    fs.writeFileSync(path.join(other, 'Catalunya_4-4665.json'), '{"points":[],"corners":[]}'); // another length
+    fs.writeFileSync(path.join(other, 'boost.json'), '{}');
+    assert.equal(find({bundledTrackDir: other}), false, 'only the same id and length');
+  });
+  test('the API serves a map by its key whatever the file is called', async () => {
+    const bundledTrackDir = tmpDir();
+    fs.writeFileSync(path.join(bundledTrackDir, 'Catalunya_4-4664.json'), '{"name":"by track name"}');
+    const d = offline({bundledTrackDir});
+    const {http: port} = await d.start();
+    assert.equal(JSON.parse((await get(port, '/api/track?id=4&len=4664')).body).name, 'by track name');
+    assert.equal((await get(port, '/api/track?id=14&len=4664')).status, 404);
   });
   test('no track maps in demo mode, or before a session', () => {
     const demo = offline({demo: true, trackComplete: easy});
@@ -650,20 +672,20 @@ describe('track maps', () => {
     // official data: the learned outline itself, scaled up, with three of its points as corners
     const probeDir = tmpDir(), trackDir = tmpDir();
     learnFrom({trackDir: probeDir});
-    const points = JSON.parse(fs.readFileSync(path.join(probeDir, '4-4664.json'), 'utf8')).points;
+    const points = JSON.parse(fs.readFileSync(path.join(probeDir, 'Catalunya_4-4664.json'), 'utf8')).points;
     assert.ok(points.length > 16);
     const pick = [0, Math.floor(points.length / 2), points.length - 1].map(i => points[i]);
     const officialFile = path.join(tmpDir(), 'official.json');
     fs.writeFileSync(officialFile, JSON.stringify({4: {outline: points.map(p => [p[1] * 3, p[2] * 3]), corners: pick.map((p, i) => ({n: String(i + 1), x: p[1] * 3, y: p[2] * 3}))}}));
     learnFrom({trackDir, officialFile});
-    const saved = JSON.parse(fs.readFileSync(path.join(trackDir, '4-4664.json'), 'utf8'));
+    const saved = JSON.parse(fs.readFileSync(path.join(trackDir, 'Catalunya_4-4664.json'), 'utf8'));
     assert.deepEqual(saved.corners.map(c => c.n), ['1', '2', '3']);
     assert.ok(saved.corners.every((c, i) => Math.abs(c.d - (pick[i][0] * 8 + 4)) <= 8));
   });
   test('without the official corner data, maps are still saved, just without numbers', () => {
     const trackDir = tmpDir();
     learnFrom({trackDir, officialFile: path.join(tmpDir(), 'missing.json')});
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(trackDir, '4-4664.json'), 'utf8')).corners, []);
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(trackDir, 'Catalunya_4-4664.json'), 'utf8')).corners, []);
   });
   test('GET /api/track: the learned map first, then the shipped one; 404 and 400 otherwise', async () => {
     const trackDir = tmpDir(), bundledTrackDir = tmpDir();

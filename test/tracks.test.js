@@ -8,6 +8,7 @@ const {FIXTURE} = require('./helpers');
 const {buildTrack, main: buildMain} = require('../scripts/build-tracks');
 const official = require('../scripts/fetch-official-corners');
 const {constants} = require('../build/src');
+const {trackMapFileName, mapFileKey} = require('../build/shared');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pitwall-tracks-'));
 after(() => fs.rmSync(dir, {recursive: true, force: true}));
@@ -20,10 +21,10 @@ const quietLog = () => {
 };
 
 describe('building shipped track maps', () => {
-  test('a recording with a whole lap becomes <trackId>-<trackLength>.json; a second one is left alone', () => {
+  test('a recording with a whole lap becomes <Track>_<trackId>-<trackLength>.json; a second one is left alone', () => {
     const out = folder();
     const r = buildTrack(FIXTURE, {out, trackComplete: easy});
-    assert.deepEqual(r, {track: 'Catalunya', file: path.join(out, '4-4664.json')});
+    assert.deepEqual(r, {track: 'Catalunya', file: path.join(out, 'Catalunya_4-4664.json')});
     const map = JSON.parse(fs.readFileSync(r.file, 'utf8'));
     assert.equal(map.trackId, 4);
     assert.ok(map.points.length > 0 && Array.isArray(map.corners));
@@ -44,13 +45,19 @@ describe('building shipped track maps', () => {
     fs.writeFileSync(file, '{"type":"f1rec"}\n' + packets.map((b, i) => JSON.stringify([i * 50, b.toString('base64')])).join('\n') + '\n');
     // for the test, whatever the outline covers is "a whole lap"
     const r = buildTrack(file, {out, trackComplete: {coverage: 0, maxGap: Infinity}});
-    assert.deepEqual(r, {track: 'Madrid', file: path.join(out, '42-5476.json'), boost: 2992});
+    assert.deepEqual(r, {track: 'Madrid', file: path.join(out, 'Madrid_42-5476.json'), boost: 2992});
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(out, 'boost.json'), 'utf8')), {'42-5476': 2992});
     // a track that has its map and its detection point already: reported, nothing new written
     assert.deepEqual(buildTrack(file, {out, trackComplete: {coverage: 0, maxGap: Infinity}}), {track: 'Madrid', skipped: 'already has a map', boost: 2992});
     const lines = quietLog();
     assert.equal(buildMain([file], {log: lines.log, out: folder(), trackComplete: {coverage: 0, maxGap: Infinity}}), 0);
     assert.match(lines.lines[0], /overtake detection at 2992 m/);
+  });
+  test('a map that has the older plain <trackId>-<trackLength>.json name still counts as the track\'s map', () => {
+    const out = folder();
+    fs.writeFileSync(path.join(out, '4-4664.json'), '{"points":[],"corners":[]}');
+    assert.deepEqual(buildTrack(FIXTURE, {out, trackComplete: easy}), {track: 'Catalunya', skipped: 'already has a map'});
+    assert.deepEqual(fs.readdirSync(out), ['4-4664.json']);
   });
   test('not a whole lap, or no session at all: nothing written', () => {
     const out = folder();
@@ -68,7 +75,7 @@ describe('building shipped track maps', () => {
     fs.writeFileSync(path.join(recs, 'notes.txt'), 'x');
     const {lines, log} = quietLog();
     assert.equal(buildMain([], {dir: recs, out, log, trackComplete: easy}), 1, 'one could not be read');
-    assert.match(lines[0], /^Catalunya: 4-4664\.json \(\d+ corners\)$/);
+    assert.match(lines[0], /^Catalunya: Catalunya_4-4664\.json \(\d+ corners\)$/);
     assert.equal(lines[1], 'b.jsonl: Catalunya already has a map');
     assert.match(lines[2], /^ERROR Could not read .*c\.jsonl: Not a recording file/);
     const empty = quietLog();
@@ -81,10 +88,12 @@ describe('building shipped track maps', () => {
   test('the shipped maps are well formed', () => {
     const shipped = path.join(__dirname, '..', 'tracks', 'maps');
     const files = fs.readdirSync(shipped).filter(f => f !== 'boost.json');
-    assert.ok(files.length >= 7, files.join(','));
+    assert.ok(files.length >= 17, files.join(','));
     for (const f of files) {
-      const [id, len] = f.replace('.json', '').split('-').map(Number);
       const map = JSON.parse(fs.readFileSync(path.join(shipped, f), 'utf8'));
+      const [id, len] = [map.trackId, map.trackLength];
+      assert.equal(f, trackMapFileName(map.name, id, len), `${f} is named after its track`);
+      assert.equal(mapFileKey(f), `${id}-${len}`, f);
       assert.equal(map.trackId, id, f);
       assert.equal(map.trackLength, len, f);
       assert.ok(map.points.length >= len / 8 * 0.95, `${f}: an outline round the whole lap`);

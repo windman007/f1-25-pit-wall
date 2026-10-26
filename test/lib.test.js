@@ -296,6 +296,29 @@ describe('recording names', () => {
   });
 });
 
+describe('track map file names', () => {
+  test('named after the track, then the game id and lap length', () => {
+    assert.equal(L.trackMapFileName('Silverstone', 7, 5890), 'Silverstone_7-5890.json');
+    assert.equal(L.trackMapFileName('Abu Dhabi', 14, 5280), 'Abu-Dhabi_14-5280.json');
+    assert.equal(L.trackMapFileName('Portimão', 28, 4653), 'Portimao_28-4653.json');
+    assert.equal(L.trackMapFileName('Silverstone Reverse', 39, 5890), 'Silverstone-Reverse_39-5890.json');
+    assert.equal(L.trackMapFileName('../../etc', 1, 2), 'etc_1-2.json', 'never a path');
+    assert.equal(L.trackMapFileName('', 7, 5890), '7-5890.json', 'no track name: the key alone');
+    assert.equal(L.trackMapFileName(null, 7, 5890), '7-5890.json');
+    assert.equal(L.trackMapKey(7, 5890), '7-5890');
+  });
+  test('the key is read back from a file name: new names, the older plain ones, and nothing else', () => {
+    assert.equal(L.mapFileKey('Silverstone_7-5890.json'), '7-5890');
+    assert.equal(L.mapFileKey('Abu-Dhabi_14-5280.json'), '14-5280');
+    assert.equal(L.mapFileKey('7-5890.json'), '7-5890');
+    assert.equal(L.mapFileKey('boost.json'), null);
+    assert.equal(L.mapFileKey('Silverstone_7-5890.json.tmp'), null);
+    assert.equal(L.mapFileKey('notes.txt'), null);
+    assert.equal(L.mapFileKey('X_14-5890.json'), '14-5890', 'the whole id, not its last digit');
+    assert.notEqual(L.mapFileKey('X_14-5890.json'), '4-5890');
+  });
+});
+
 describe('dashboard arrangement', () => {
   const ids = ['a', 'b', 'c', 'd', 'e'];
   const def = {cols: [['a', 'b'], ['c', 'd'], ['e']]};

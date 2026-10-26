@@ -14,7 +14,7 @@ A live F1 25 telemetry dashboard ("Pit Wall") built on the `f1-udp-parser` TypeS
 | `replay.js`, `listen.js` | Recording file format (read and write), replay a recording to UDP; console-only listener |
 | `scripts/compress-recordings.js` | Converts old plain `.jsonl` recordings to compressed `.f1rec`, verified packet by packet |
 | `scripts/rename-recordings.js` | Renames old `session-<time>` recordings after their track, session and format, like new ones are named (`recordingName()` in `shared/`) |
-| `scripts/build-tracks.js`, `scripts/fetch-official-corners.js` | Build the shipped track maps (`tracks/maps/`) and overtake detection points (`tracks/maps/boost.json`) from recordings; fetch the official corner data (`tracks/official.json`) |
+| `scripts/build-tracks.js`, `scripts/fetch-official-corners.js` | Build the shipped track maps (`tracks/maps/<Track>_<id>-<length>.json`) and overtake detection points (`tracks/maps/boost.json`) from recordings; fetch the official corner data (`tracks/official.json`) |
 | `shared/` | Pure dashboard logic in TypeScript (formatting, projections, map/trace helpers, message types), used by the page, the server (compiled to `build/shared` by `npm run compile`) and the tests |
 | `web/` | The page: React + TypeScript (Vite, Zustand). Its own package: `npm --prefix web install`, built to `web/dist` by `npm run build:web` and served by `server.js` |
 | `web/src/store/` | State: `dashboard.ts` (the latest server message), `ui.ts` (settings and open windows), `layout.ts` (arrangement and sizes) |
