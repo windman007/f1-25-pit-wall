@@ -7,6 +7,7 @@ import {App} from '../src/App';
 import {connect, disconnect} from '../src/net/connection';
 import {useDashboard} from '../src/store/dashboard';
 import {resetLayout} from '../src/store/layout';
+import {resetMapRotation} from '../src/store/mapRotation';
 import {resetUi} from '../src/store/ui';
 import {resetBuffers} from '../src/telemetry/buffers';
 
@@ -111,6 +112,7 @@ export async function boot({storage = {}, desktop = true, width = 1600, height =
   FakeWebSocket.sockets = [];
   resetUi();
   resetLayout();
+  resetMapRotation();
   resetBuffers();
   useDashboard.setState({state: null, link: 'connecting', bestLap: 0});
   const view = render(<App />);

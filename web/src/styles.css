@@ -205,6 +205,15 @@ canvas { display: block; width: 100%; }
 
 /* ----- Track map ----- */
 .mapcv { aspect-ratio: 1; background: radial-gradient(circle at 50% 40%, #10131c, var(--inset) 70%); border: 1px solid var(--line); border-radius: 8px; }
+.map h2 { flex-wrap: wrap; row-gap: 4px; }
+.mapcv { cursor: grab; }
+body.spinning, body.spinning * { cursor: grabbing !important; user-select: none; }
+.mapctl { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.mapctl button { font: 600 12px/1 var(--f-ui); letter-spacing: 0; text-transform: none; color: var(--dim); background: transparent;
+  border: 1px solid var(--line2); border-radius: 6px; padding: 3px 7px; cursor: pointer; }
+.mapctl button:hover:not(:disabled), .mapctl button:focus-visible { color: var(--text); border-color: var(--amber); outline: none; }
+.mapctl button:disabled { opacity: .35; cursor: default; }
+.mapctl .maprst { color: var(--amber); border-color: rgba(255, 176, 32, .45); font-variant-numeric: tabular-nums; }
 .g { display: flex; justify-content: space-between; margin-top: 8px; font: 600 10px/1 var(--f-display); letter-spacing: .18em; color: var(--dim); }
 .g b { color: var(--text); font: 500 13px/1 var(--f-mono); margin-left: 6px; }
 

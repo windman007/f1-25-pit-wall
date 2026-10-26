@@ -9,6 +9,7 @@ export const KEYS = {
   arrangement: 'pitwall-arrangement-v1',
   popup: 'pitwall-popup-v1',
   replayPos: 'pitwall-replay-pos',
+  mapRotation: 'pitwall-maprot-v1',
 } as const;
 
 export function readText(key: string): string | null {

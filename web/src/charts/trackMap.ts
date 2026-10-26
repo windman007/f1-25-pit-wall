@@ -1,4 +1,5 @@
-// Track map: the learned outline, 2026 active aero and DRS zones, every rival and your car.
+// Track map: the learned outline, 2026 active aero and DRS zones, every rival and your car. It can be turned
+// (rotation, in degrees clockwise); the map is fitted to the canvas again at every angle.
 import {TRACK_BUCKET_M, zoneRanges} from '@shared';
 import type {Corner, Motion, Rival, Session, TrackOutline, Zone} from '@shared';
 import {DISPLAY_FONT} from './fonts';
@@ -13,9 +14,11 @@ export interface MapInput {
   session: Session | null | undefined;
   /** Official corner numbers, drawn beside the outline. */
   corners?: Corner[];
+  /** Degrees clockwise the map is turned; 0 (the default) keeps the game's own orientation. */
+  rotation?: number;
 }
 
-export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number, {track, rivals: all, car, session, corners = []}: MapInput): void {
+export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number, {track, rivals: all, car, session, corners = [], rotation = 0}: MapInput): void {
   const rivals = all.filter(r => !r.player && (r.x || r.z)) as (Rival & {x: number; z: number})[];
   const keys = [...track.keys()].sort((a, b) => a - b);
   const pts = [...keys.map(k => track.get(k)!), ...rivals, ...(car ? [car] : [])];
@@ -26,15 +29,21 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number
     ctx.fillText('WAITING FOR CARS ON TRACK', w / 2, h / 2);
     return;
   }
+  // positions as turned about the origin; everything below is placed with these
+  const turn = (rotation * Math.PI) / 180,
+    cos = Math.cos(turn),
+    sin = Math.sin(turn);
+  const rx = (p: {x: number; z: number}) => p.x * cos - p.z * sin,
+    rz = (p: {x: number; z: number}) => p.x * sin + p.z * cos;
   let minX = Infinity,
     maxX = -Infinity,
     minZ = Infinity,
     maxZ = -Infinity;
   for (const p of pts) {
-    minX = Math.min(minX, p.x);
-    maxX = Math.max(maxX, p.x);
-    minZ = Math.min(minZ, p.z);
-    maxZ = Math.max(maxZ, p.z);
+    minX = Math.min(minX, rx(p));
+    maxX = Math.max(maxX, rx(p));
+    minZ = Math.min(minZ, rz(p));
+    maxZ = Math.max(maxZ, rz(p));
   }
   const pad = 22,
     spanX = maxX - minX || 1,
@@ -42,8 +51,8 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number
   const scale = Math.min((w - pad * 2) / spanX, (h - pad * 2) / spanZ);
   const ox = (w - spanX * scale) / 2,
     oy = (h - spanZ * scale) / 2;
-  const px = (p: {x: number}) => ox + (p.x - minX) * scale,
-    py = (p: {z: number}) => oy + (p.z - minZ) * scale;
+  const px = (p: {x: number; z: number}) => ox + (rx(p) - minX) * scale,
+    py = (p: {x: number; z: number}) => oy + (rz(p) - minZ) * scale;
 
   // outline: connect consecutive buckets, break the line across gaps not yet driven
   if (keys.length > 1) {
@@ -139,8 +148,8 @@ function drawMapCorners(
   track: TrackOutline,
   keys: number[],
   corners: Corner[],
-  px: (p: {x: number}) => number,
-  py: (p: {z: number}) => number
+  px: (p: {x: number; z: number}) => number,
+  py: (p: {x: number; z: number}) => number
 ) {
   const at = (k: number) => {
     for (let o = 0; o < 12; o++) {
