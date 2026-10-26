@@ -807,9 +807,11 @@ if (require.main === module) {
     console.error('Usage: node server.js --replay <recording.f1rec|.jsonl>');
     process.exit(1);
   }
+  // an unset or empty variable means the default; 0 means any free port
+  const envPort = (name, fallback) => (process.env[name] ? Number(process.env[name]) : fallback);
   const dashboard = createDashboard({
-    httpPort: Number(process.env.PORT) || 3000,
-    udpPort: Number(process.env.UDP_PORT) || 20777,
+    httpPort: envPort('PORT', 3000),
+    udpPort: envPort('UDP_PORT', 20777),
     publicDir: process.env.PUBLIC_DIR ? path.resolve(process.env.PUBLIC_DIR) : undefined,
     demo: process.argv.includes('--demo'),
     replayFile,
