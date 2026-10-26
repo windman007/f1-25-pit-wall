@@ -601,7 +601,7 @@ describe('track maps', () => {
   test('an outline learned from the cars is saved once, with the track and its points', () => {
     const trackDir = tmpDir(), logs = [];
     const d = learnFrom({trackDir, log: {...quiet, log: m => logs.push(m)}});
-    assert.deepEqual(d.state.trackMap, {trackId: 4, trackLength: 4664, available: true});
+    assert.deepEqual(d.state.trackMap, {trackId: 4, trackLength: 4664, available: true, boost: null});
     const saved = JSON.parse(fs.readFileSync(path.join(trackDir, '4-4664.json'), 'utf8'));
     assert.equal(saved.name, 'Catalunya');
     assert.equal(saved.trackLength, 4664);
@@ -616,7 +616,7 @@ describe('track maps', () => {
   test('not complete yet: nothing saved, not available', () => {
     const trackDir = tmpDir();
     const d = learnFrom({trackDir, trackComplete: {}});
-    assert.deepEqual(d.state.trackMap, {trackId: 4, trackLength: 4664, available: false});
+    assert.deepEqual(d.state.trackMap, {trackId: 4, trackLength: 4664, available: false, boost: null});
     assert.deepEqual(fs.readdirSync(trackDir), []);
   });
   test('a shipped outline is used as it is: nothing learned or saved', () => {
@@ -940,6 +940,108 @@ describe('session time', () => {
     assert.equal(se.timeLeft, 3600);
     assert.equal(se.duration, 7200);
     assert.equal(se.sessionType, 15);
+  });
+});
+
+describe('overtake detection point', () => {
+  const f26 = require('./f1-2026');
+  // the player is car 0: its lap distance (lap data) and its overtake countdown (car telemetry 2)
+  const LAP_DISTANCE = 29 + 20, COUNTDOWN = 29 + 6, REGS_2026 = 29 + 8;
+  const KEY = '42-5476'; // the 2026 test session: Madrid, 5476 m
+  function drive(d, dist, left, {regs = 1} = {}) {
+    const lap = f26.build('lapData');
+    lap.writeFloatLE(dist, LAP_DISTANCE);
+    const t2 = f26.build('carTelemetry2');
+    t2.writeUInt16LE(left, COUNTDOWN);
+    t2[REGS_2026] = regs;
+    d.handlePacket(lap);
+    d.handlePacket(t2);
+  }
+  function session(opts = {}) {
+    const trackDir = tmpDir();
+    const d = offline({trackDir, ...opts});
+    d.handlePacket(f26.build('session'));
+    return {d, trackDir};
+  }
+  const saved = dir => JSON.parse(fs.readFileSync(path.join(dir, 'boost.json'), 'utf8'));
+
+  test('the countdown that starts is the detection point: saved per track, and sent with the map info', () => {
+    const {d, trackDir} = session();
+    drive(d, 1200, 0);
+    assert.equal(d.refreshState().lap.m_lapDistance, 1200, 'the test packets say what they should');
+    assert.equal(d.refreshState().trackMap.boost, null, 'not known yet');
+    drive(d, 2996, 296); // first reading: 4 m into the 300 m countdown
+    assert.equal(d.refreshState().trackMap.boost, 2992);
+    assert.deepEqual(saved(trackDir), {[KEY]: 2992});
+    for (const [dist, left] of [[3100, 192], [3290, 2], [3300, 0]]) drive(d, dist, left);
+    drive(d, 4500, 300); // the next lap's countdown: the first one stays
+    assert.equal(d.refreshState().trackMap.boost, 2992);
+    assert.deepEqual(saved(trackDir), {[KEY]: 2992});
+  });
+
+  test('only a countdown seen from its start, on the lap, in format 2026 counts', () => {
+    const {d, trackDir} = session();
+    drive(d, 1000, 150); // joined half way
+    drive(d, 1100, 50);
+    drive(d, 1150, 0);
+    drive(d, -300, 299); // before the start line
+    drive(d, -200, 199);
+    drive(d, -10, 0);
+    drive(d, 2000, 0, {regs: 0});
+    drive(d, 2100, 300, {regs: 0}); // a car without the 2026 rules
+    drive(d, 2200, 0);
+    assert.equal(d.refreshState().trackMap.boost, null);
+    assert.equal(fs.existsSync(path.join(trackDir, 'boost.json')), false);
+    drive(d, 3000, 300);
+    assert.equal(d.refreshState().trackMap.boost, 3000);
+  });
+
+  test('a countdown that started just before the line is placed at the end of the lap', () => {
+    const {d} = session();
+    drive(d, 0, 0);
+    drive(d, 4, 290); // 10 m in, 4 m past the line: 6 m before it
+    assert.equal(d.refreshState().trackMap.boost, 5470);
+  });
+
+  test('a shipped detection point is used at once; a learned one wins over it; neither is learned again', () => {
+    const bundledTrackDir = tmpDir();
+    fs.writeFileSync(path.join(bundledTrackDir, 'boost.json'), JSON.stringify({[KEY]: 111, '1-1': 5}));
+    const a = session({bundledTrackDir});
+    assert.equal(a.d.refreshState().trackMap.boost, 111);
+    drive(a.d, 2000, 0);
+    drive(a.d, 2900, 300);
+    assert.equal(a.d.refreshState().trackMap.boost, 111, 'known: no new countdown is learned');
+    assert.equal(fs.existsSync(path.join(a.trackDir, 'boost.json')), false);
+    const learnedDir = tmpDir();
+    fs.writeFileSync(path.join(learnedDir, 'boost.json'), JSON.stringify({[KEY]: 222}));
+    const b = session({bundledTrackDir, trackDir: learnedDir});
+    assert.equal(b.d.refreshState().trackMap.boost, 222);
+    fs.writeFileSync(path.join(learnedDir, 'boost.json'), '{oops');
+    const c = session({bundledTrackDir: tmpDir(), trackDir: learnedDir});
+    assert.equal(c.d.refreshState().trackMap.boost, null, 'an unreadable file is as good as none');
+  });
+
+  test('a learned point is added to the file already there; a file that cannot be written is logged, not fatal', () => {
+    const trackDir = tmpDir();
+    fs.writeFileSync(path.join(trackDir, 'boost.json'), JSON.stringify({'4-4664': 3000}));
+    const {d} = session({trackDir});
+    drive(d, 1000, 0);
+    drive(d, 2000, 300);
+    assert.deepEqual(saved(trackDir), {'4-4664': 3000, [KEY]: 2000});
+    const blocker = path.join(tmpDir(), 'file');
+    fs.writeFileSync(blocker, 'x');
+    const errors = [];
+    const e = session({trackDir: path.join(blocker, 'learned'), log: {log() {}, warn() {}, error: m => errors.push(m)}});
+    drive(e.d, 1000, 0);
+    drive(e.d, 2000, 300);
+    assert.equal(e.d.refreshState().trackMap.boost, 2000, 'still used for this run');
+    assert.match(errors.join(), /Could not save the Madrid overtake detection point/);
+  });
+
+  test('demo mode has no map, so nothing is learned', () => {
+    const d = offline({demo: true});
+    d.applyDemoFrame(0);
+    assert.equal(d.refreshState().trackMap, null);
   });
 });
 

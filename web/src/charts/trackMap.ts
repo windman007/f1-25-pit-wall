@@ -6,6 +6,8 @@ import {DISPLAY_FONT} from './fonts';
 
 export const AERO_ZONE_COLOR = 'rgba(51, 214, 232, .9)';
 export const DRS_ZONE_COLOR = 'rgba(31, 209, 102, .9)';
+/** The overtake (boost) detection point, 2026. */
+export const BOOST_MARK_COLOR = '#ffb020';
 
 export interface MapInput {
   track: TrackOutline;
@@ -16,9 +18,13 @@ export interface MapInput {
   corners?: Corner[];
   /** Degrees clockwise the map is turned; 0 (the default) keeps the game's own orientation. */
   rotation?: number;
+  /** The game's UDP format. 2026 has no DRS: only the active aero zones and the boost detection point are drawn. */
+  format?: number | null;
+  /** Lap distance (m) of the overtake detection point, once it is known. */
+  boost?: number | null;
 }
 
-export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number, {track, rivals: all, car, session, corners = [], rotation = 0}: MapInput): void {
+export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number, {track, rivals: all, car, session, corners = [], rotation = 0, format, boost}: MapInput): void {
   const rivals = all.filter(r => !r.player && (r.x || r.z)) as (Rival & {x: number; z: number})[];
   const keys = [...track.keys()].sort((a, b) => a - b);
   const pts = [...keys.map(k => track.get(k)!), ...rivals, ...(car ? [car] : [])];
@@ -102,8 +108,9 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number
   };
   if (session && keys.length > 1) {
     drawZones(zoneRanges(session.aeroZones, session.trackLength), AERO_ZONE_COLOR);
-    drawZones(zoneRanges(session.drsZones, session.trackLength), DRS_ZONE_COLOR);
+    if ((format ?? 0) < 2026) drawZones(zoneRanges(session.drsZones, session.trackLength), DRS_ZONE_COLOR);
   }
+  if (boost != null && (format ?? 0) >= 2026 && keys.length > 1) drawBoostDetection(ctx, track, boost, px, py);
 
   if (corners.length && keys.length > 1) drawMapCorners(ctx, track, keys, corners, px, py);
 
@@ -142,6 +149,47 @@ export function drawTrackMap(ctx: CanvasRenderingContext2D, w: number, h: number
   }
 }
 
+/** The outline point nearest to bucket k (the outline can have gaps), or null. */
+function outlineAt(track: TrackOutline, k: number) {
+  for (let o = 0; o < 12; o++) {
+    const p = track.get(k + o) || track.get(k - o);
+    if (p) return p;
+  }
+  return null;
+}
+
+/** The overtake detection point: a bar across the track at that lap distance. */
+function drawBoostDetection(
+  ctx: CanvasRenderingContext2D,
+  track: TrackOutline,
+  boost: number,
+  px: (p: {x: number; z: number}) => number,
+  py: (p: {x: number; z: number}) => number
+) {
+  const k = Math.floor(boost / TRACK_BUCKET_M),
+    p = outlineAt(track, k),
+    a = outlineAt(track, k - 4),
+    b = outlineAt(track, k + 4);
+  if (!p || !a || !b) return;
+  const tx = px(b) - px(a),
+    ty = py(b) - py(a),
+    len = Math.hypot(tx, ty) || 1,
+    nx = (-ty / len) * 11,
+    ny = (tx / len) * 11,
+    x = px(p),
+    y = py(p);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - nx, y - ny);
+  ctx.lineTo(x + nx, y + ny);
+  ctx.strokeStyle = 'rgba(7, 8, 11, .9)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.strokeStyle = BOOST_MARK_COLOR;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
+
 /** Official corner numbers just beside the track: of the two sides, the one further from the rest of the outline. */
 function drawMapCorners(
   ctx: CanvasRenderingContext2D,
@@ -151,13 +199,7 @@ function drawMapCorners(
   px: (p: {x: number; z: number}) => number,
   py: (p: {x: number; z: number}) => number
 ) {
-  const at = (k: number) => {
-    for (let o = 0; o < 12; o++) {
-      const p = track.get(k + o) || track.get(k - o);
-      if (p) return p;
-    }
-    return null;
-  };
+  const at = (k: number) => outlineAt(track, k);
   const outline = keys.filter((_, i) => i % 3 === 0).map(k => [px(track.get(k)!), py(track.get(k)!)]);
   const clearance = (x: number, y: number) => outline.reduce((m, [ox, oy]) => Math.min(m, Math.hypot(ox - x, oy - y)), Infinity);
   ctx.font = `700 11px ${DISPLAY_FONT}`;

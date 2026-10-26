@@ -195,6 +195,8 @@ export interface TrackMapInfo {
   trackId: number;
   trackLength: number;
   available: boolean;
+  /** UDP format 2026: lap distance (m) of the overtake detection point, once it is known for this track. */
+  boost?: number | null;
 }
 
 export interface DashboardState {
