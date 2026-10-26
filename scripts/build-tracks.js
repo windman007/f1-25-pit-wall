@@ -1,4 +1,4 @@
-// Builds the shipped track maps (public/tracks/<trackId>-<trackLength>.json) from recordings. Each recording is
+// Builds the shipped track maps (tracks/maps/<trackId>-<trackLength>.json) from recordings. Each recording is
 // played through a dashboard, whose own track learning saves the outline, with its official corner numbers, once
 // a whole lap is known. Tracks that already have a shipped map are left as they are.
 // Usage: node scripts/build-tracks.js [recordings/a.f1rec ...]   (no files: every recording in recordings/)
@@ -7,7 +7,7 @@ const path = require('path');
 const {createDashboard} = require('../server');
 const {loadRecording, isRecordingName} = require('../replay');
 
-const OUT = path.join(__dirname, '..', 'public', 'tracks');
+const OUT = path.join(__dirname, '..', 'tracks', 'maps');
 const quiet = {log() {}, warn() {}, error() {}};
 
 // {track, file} when a map was written, {track, skipped} otherwise

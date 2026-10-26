@@ -56,7 +56,7 @@ describe('building shipped track maps', () => {
     assert.equal(named.lines[0], 'catalunya-f125.jsonl: Catalunya no complete lap in this recording');
   });
   test('the shipped maps are well formed', () => {
-    const shipped = path.join(__dirname, '..', 'public', 'tracks');
+    const shipped = path.join(__dirname, '..', 'tracks', 'maps');
     const files = fs.readdirSync(shipped);
     assert.ok(files.length >= 7, files.join(','));
     for (const f of files) {

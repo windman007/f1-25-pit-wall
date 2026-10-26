@@ -7,7 +7,7 @@ A live telemetry dashboard for **F1 25** and **F1 26** (the F1 25 2026 Season Pa
 ## Quick start
 
 ```
-$ npm install
+$ npm run setup            # installs the server and the page (web/)
 $ npm start                # live: listens for the game on UDP 20777
 $ npm run demo             # synthetic data, no game needed
 $ npm run replay:dash -- recordings/<file>.f1rec   # play back a recording
@@ -52,7 +52,7 @@ You can also start one from the command line with `npm run replay:dash -- record
 
 ### Track maps and corners
 
-Shipped maps are in `public/tracks/`, made from the game's own coordinates with `npm run tracks:build` (it plays every recording in `recordings/` until it has a whole lap of a track that has no map yet). Maps the dashboard learns while you drive are saved to `tracks-learned/` (git-ignored). Corner numbers come from the official circuit data in `tracks/official.json`, fitted onto each outline so they match the game's lap distance; `npm run tracks:fetch-official` refreshes it from the [MultiViewer](https://multiviewer.app) circuits API (the F1 live-timing data FastF1 uses). Reverse and short layouts have no official numbering.
+Shipped maps are in `tracks/maps/`, made from the game's own coordinates with `npm run tracks:build` (it plays every recording in `recordings/` until it has a whole lap of a track that has no map yet). Maps the dashboard learns while you drive are saved to `tracks-learned/` (git-ignored). Corner numbers come from the official circuit data in `tracks/official.json`, fitted onto each outline so they match the game's lap distance; `npm run tracks:fetch-official` refreshes it from the [MultiViewer](https://multiviewer.app) circuits API (the F1 live-timing data FastF1 uses). Reverse and short layouts have no official numbering.
 
 Recordings are `.f1rec` files: a plain JSON header line, then the packets brotli-compressed as they arrive (flushed every 2 s, so a crash loses at most that). A 34-minute online race is about 39 MB instead of 450 MB. Older plain `.jsonl` recordings still play; `npm run recordings:compress` converts them, checking every packet against the original before removing it (`-- --keep` keeps the originals).
 
@@ -61,8 +61,12 @@ Recordings are `.f1rec` files: a plain JSON header line, then the packets brotli
 ```
 $ npm test                       # runs the whole suite (also runs before every push)
 $ npm run test:coverage
-$ node scripts/screenshots.js    # regenerates docs/*.png (needs Google Chrome)
+$ npm run demo                   # in one terminal: the server with synthetic data
+$ npm run dev:web                # in another: the page with hot reload on http://localhost:5173
+$ npm run build:web && node scripts/screenshots.js    # regenerates docs/*.png (needs Google Chrome)
 ```
+
+The page is a React + TypeScript app in `web/` (Vite, Zustand), built into `web/dist` and served by `server.js`. Server messages arrive about 30 times a second: each part of the page subscribes only to the fields it shows, and the charts draw from buffers on animation frames, so a message never re-renders more than what changed.
 
 New functionality comes with tests; see [AGENTS.md](AGENTS.md) for the layout of the repo and the rules.
 

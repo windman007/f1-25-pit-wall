@@ -5,4 +5,5 @@ lib
 .vscode
 .DS_Store
 recordings/
+web/dist
 tracks-learned/
