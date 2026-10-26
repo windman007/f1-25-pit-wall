@@ -759,6 +759,26 @@ describe('track map', () => {
     p.push(dashboardState({session: {...s.session!, aeroZones: [], drsZones: []}}));
     expect(p.$('.maplegend')).toBeNull();
   });
+  test('the legend follows the format: DRS before 2026; active aero and, once known, the boost detection point in 2026', async () => {
+    const p = await boot();
+    const s = dashboardState();
+    const zones = {aeroZones: [[0.1, 0.2]] as [number, number][], drsZones: [[0.5, 0.6]] as [number, number][]};
+    const legend = () => (p.$('.maplegend') ? text(p.$('.maplegend')) : null);
+    p.push(dashboardState({session: {...s.session!, ...zones, packetFormat: 2025}}));
+    expect(legend(), '2025: aero zones are not a thing, but the legend shows what the game sent').toBe('ACTIVE AERO DRS');
+    p.push(dashboardState({session: {...s.session!, ...zones, aeroZones: [], packetFormat: 2025}}));
+    expect(legend()).toBe('DRS');
+    p.push(dashboardState({session: {...s.session!, ...zones, packetFormat: 2026}}));
+    expect(legend(), 'no DRS in 2026').toBe('ACTIVE AERO');
+    p.push({...dashboardState({session: {...s.session!, ...zones, packetFormat: 2026}}), trackMap: {trackId: 5, trackLength: 3323, available: true, boost: null}});
+    expect(legend(), 'detection point not known yet').toBe('ACTIVE AERO');
+    p.push({...dashboardState({session: {...s.session!, ...zones, packetFormat: 2026}}), trackMap: {trackId: 5, trackLength: 3323, available: true, boost: 2900}});
+    expect(legend()).toBe('ACTIVE AERO BOOST DETECTION');
+    p.push({...dashboardState({session: {...s.session!, ...zones, aeroZones: [], packetFormat: 2026}}), trackMap: {trackId: 5, trackLength: 3323, available: true, boost: 2900}});
+    expect(legend(), 'Monaco: no aero zones, only the detection point').toBe('BOOST DETECTION');
+    p.push({...dashboardState({session: {...s.session!, ...zones, aeroZones: [], packetFormat: 2026}})});
+    expect(legend(), 'nothing to explain').toBeNull();
+  });
 });
 
 describe('F1 26 (UDP format 2026)', () => {

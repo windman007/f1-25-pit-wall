@@ -3,7 +3,7 @@ import {describe, expect, test} from 'vitest';
 import type {DistPoint, LapTraces, Motion, TimePoint} from '@shared';
 import {drawCompareChart, type CompareChartInput} from '../src/charts/compareChart';
 import {drawPedalTrace} from '../src/charts/pedalTrace';
-import {AERO_ZONE_COLOR, DRS_ZONE_COLOR, drawTrackMap} from '../src/charts/trackMap';
+import {AERO_ZONE_COLOR, BOOST_MARK_COLOR, DRS_ZONE_COLOR, drawTrackMap} from '../src/charts/trackMap';
 import {buffers, ingest, resetBuffers} from '../src/telemetry/buffers';
 import {dashboardState, demoRivals, fakeContext} from './helpers';
 
@@ -38,6 +38,28 @@ describe('track map', () => {
     drawTrackMap(f.ctx, 400, 300, {track: buffers.track, rivals: s.rivals!, car: null, session: {...s.session!, aeroZones: [], drsZones: []}});
     expect(strokes(f.log)).not.toContain(AERO_ZONE_COLOR);
     expect(strokes(f.log)).not.toContain(DRS_ZONE_COLOR);
+  });
+  test('format 2026 has no DRS: active aero zones, and the boost detection point as a bar across the track', () => {
+    resetBuffers();
+    const s = dashboardState();
+    for (let t = 0; t < 30000; t += 100) ingest({...s, rivals: demoRivals(t, 1)}, {selected: null, compareOpen: false}, t);
+    const colours = (extra: object) => {
+      const f = fakeContext();
+      drawTrackMap(f.ctx, 400, 300, {track: buffers.track, rivals: s.rivals!, car: null, session: s.session, ...extra});
+      return {strokes: strokes(f.log), log: f.log};
+    };
+    const y26 = colours({format: 2026});
+    expect(y26.strokes).toContain(AERO_ZONE_COLOR);
+    expect(y26.strokes, 'no DRS in 2026').not.toContain(DRS_ZONE_COLOR);
+    expect(colours({format: 2025}).strokes, 'DRS before 2026').toContain(DRS_ZONE_COLOR);
+    expect(colours({}).strokes, 'format unknown: as before').toContain(DRS_ZONE_COLOR);
+    expect(y26.strokes, 'detection point not known yet').not.toContain(BOOST_MARK_COLOR);
+    const marked = colours({format: 2026, boost: 1500});
+    expect(marked.strokes).toContain(BOOST_MARK_COLOR);
+    expect(marked.log.filter(c => c[0] === 'stroke').length, 'the bar is one more stroke pair').toBe(y26.log.filter(c => c[0] === 'stroke').length + 2);
+    expect(colours({format: 2025, boost: 1500}).strokes, 'no boost mode before 2026').not.toContain(BOOST_MARK_COLOR);
+    expect(colours({format: 2026, boost: 99999}).strokes, 'a distance with no outline near it: nothing').not.toContain(BOOST_MARK_COLOR);
+    expect(colours({format: 2026, boost: 1500, track: new Map()}).strokes, 'no outline: nothing').not.toContain(BOOST_MARK_COLOR);
   });
 });
 

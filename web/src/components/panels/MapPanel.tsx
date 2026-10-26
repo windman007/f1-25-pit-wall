@@ -10,11 +10,17 @@ import {SPIN_STEP, rotationOf, setRotation, spinMap, useMapRotation} from '../..
 import {buffers} from '../../telemetry/buffers';
 
 export const MapPanel = memo(function MapPanel() {
-  const {zones, gLat, gLong} = useServer(s => ({
-    zones: !!(s?.session?.aeroZones?.length || s?.session?.drsZones?.length),
-    gLat: s?.motion?.gLat,
-    gLong: s?.motion?.gLong,
-  }));
+  // 2026 has no DRS: the legend shows the active aero zones and the boost detection point instead
+  const {aero, drs, detection, gLat, gLong} = useServer(s => {
+    const is2026 = (s?.session?.packetFormat ?? 0) >= 2026;
+    return {
+      aero: !!s?.session?.aeroZones?.length,
+      drs: !is2026 && !!s?.session?.drsZones?.length,
+      detection: is2026 && s?.trackMap?.boost != null,
+      gLat: s?.motion?.gLat,
+      gLong: s?.motion?.gLong,
+    };
+  });
   const trackId = useServer(s => s?.session?.trackId ?? null);
   const angle = useMapRotation(s => (trackId == null ? 0 : s.angles[trackId] ?? 0));
   const ref = useCanvasFrame((ctx, w, h) => {
@@ -26,6 +32,8 @@ export const MapPanel = memo(function MapPanel() {
       session: s?.session,
       corners: buffers.corners,
       rotation: rotationOf(s?.session?.trackId),
+      format: s?.session?.packetFormat,
+      boost: s?.trackMap?.boost,
     });
   });
 
@@ -47,12 +55,26 @@ export const MapPanel = memo(function MapPanel() {
     <>
       <h2>
         <span>Track map</span>
-        {zones && (
+        {(aero || drs || detection) && (
           <span className="maplegend">
-            <i className="lz aero" />
-            ACTIVE AERO
-            <i className="lz drsz" />
-            DRS
+            {aero && (
+              <>
+                <i className="lz aero" />
+                ACTIVE AERO
+              </>
+            )}
+            {drs && (
+              <>
+                <i className="lz drsz" />
+                DRS
+              </>
+            )}
+            {detection && (
+              <>
+                <i className="lz boostdet" />
+                BOOST DETECTION
+              </>
+            )}
           </span>
         )}
         <span className="mapctl">

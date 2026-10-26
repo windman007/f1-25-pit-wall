@@ -563,9 +563,55 @@ function createDashboard(options = {}) {
     outlines.found.set(key, {file, at: Date.now()});
     return file;
   }
+  // --- Overtake detection point (format 2026): each lap the game starts a 300 m countdown to overtake mode for the
+  // player's car at the same spot on the track, and that spot is the detection point. It is learned from the
+  // first countdown seen on a track and kept as lap distance in <trackDir>/boost.json ({"<trackId>-<trackLength>": m});
+  // boost.json next to the shipped maps holds the ones shipped, see scripts/build-tracks.js ---
+  const BOOST_COUNTDOWN_M = 300;
+  const boosts = {data: null, left: 0};
+  const readBoosts = () => {
+    if (!boosts.data) {
+      boosts.data = {};
+      for (const dir of [bundledTrackDir, trackDir]) {
+        try {
+          Object.assign(boosts.data, JSON.parse(fs.readFileSync(path.join(dir, 'boost.json'), 'utf8')));
+        } catch (err) {
+          // none saved there yet
+        }
+      }
+    }
+    return boosts.data;
+  };
+  function learnBoost() {
+    const t2 = state.telemetry2, se = state.session, key = demo ? null : trackKey(se);
+    const left = t2 && t2.m_2026Regulations ? t2.m_overtakeActivationDistance : 0;
+    // a countdown that starts: the first reading is (nearly) the full 300 m, not one joined half way
+    const starts = !boosts.left && left >= BOOST_COUNTDOWN_M - 20;
+    boosts.left = left;
+    const dist = state.lap && state.lap.m_lapDistance;
+    if (!starts || !key || !(dist >= 0) || readBoosts()[key] != null) return;
+    const at = Math.round((((dist - (BOOST_COUNTDOWN_M - left)) % se.trackLength) + se.trackLength) % se.trackLength);
+    readBoosts()[key] = at;
+    if (state.trackMap) state.trackMap.boost = at;
+    try {
+      const file = path.join(trackDir, 'boost.json');
+      let saved = {};
+      try {
+        saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+      } catch (err) {
+        // the first one
+      }
+      fs.mkdirSync(trackDir, {recursive: true});
+      fs.writeFileSync(file + '.tmp', JSON.stringify({...saved, [key]: at}));
+      fs.renameSync(file + '.tmp', file);
+      log.log(`Saved the ${se.track} overtake detection point (${at} m) to ${path.relative(__dirname, file)}`);
+    } catch (err) {
+      log.error(`Could not save the ${se.track} overtake detection point: ${err.message}`);
+    }
+  }
   function learnOutline() {
     const se = state.session, key = demo ? null : trackKey(se);
-    state.trackMap = key ? {trackId: se.trackId, trackLength: se.trackLength, available: !!outlineFile(key)} : null;
+    state.trackMap = key ? {trackId: se.trackId, trackLength: se.trackLength, available: !!outlineFile(key), boost: readBoosts()[key] ?? null} : null;
     if (!key || state.trackMap.available || outlines.failed === key) return;
     if (outlines.key !== key) {
       outlines.key = key;
@@ -668,6 +714,7 @@ function createDashboard(options = {}) {
     client.on(PACKETS.carTelemetry2, p => {
       raw.tel2 = p.m_carTelemetry2Data;
       onPlayer(p, 'telemetry2', (pk, i) => mine(pk.m_carTelemetry2Data, i));
+      learnBoost();
     });
     client.on(PACKETS.carStatus, p => {
       raw.status = p.m_carStatusData;
