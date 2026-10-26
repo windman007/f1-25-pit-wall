@@ -151,11 +151,11 @@ function drawMapCorners(
   };
   const outline = keys.filter((_, i) => i % 3 === 0).map(k => [px(track.get(k)!), py(track.get(k)!)]);
   const clearance = (x: number, y: number) => outline.reduce((m, [ox, oy]) => Math.min(m, Math.hypot(ox - x, oy - y)), Infinity);
-  ctx.font = `700 9px ${DISPLAY_FONT}`;
+  ctx.font = `700 11px ${DISPLAY_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const placed: number[][] = [];
-  const free = (x: number, y: number) => placed.every(q => Math.hypot(q[0] - x, q[1] - y) >= 16);
+  const free = (x: number, y: number) => placed.every(q => Math.hypot(q[0] - x, q[1] - y) >= 19);
   for (const c of corners) {
     const k = Math.floor(c.d / TRACK_BUCKET_M),
       p = at(k),
@@ -176,7 +176,7 @@ function drawMapCorners(
     const [x, y] = spots.find(([sx, sy]) => free(sx, sy)) || spots[0];
     placed.push([x, y]);
     ctx.beginPath();
-    ctx.arc(x, y, 7.5, 0, Math.PI * 2);
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(15, 17, 24, .9)';
     ctx.fill();
     ctx.lineWidth = 1;

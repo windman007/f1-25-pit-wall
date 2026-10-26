@@ -21,7 +21,7 @@ export function drawCornerPasses(
   const passes = cornerPasses(trail, corners, trackLength);
   if (!passes.length) return;
   ctx.save();
-  ctx.font = `700 9px ${DISPLAY_FONT}`;
+  ctx.font = `700 11px ${DISPLAY_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   for (const p of passes) {
@@ -29,11 +29,11 @@ export function drawCornerPasses(
     if (x < o.xOf(0) || x > o.xOf(o.plotW)) continue;
     ctx.strokeStyle = 'rgba(236, 238, 243, .08)';
     ctx.beginPath();
-    ctx.moveTo(x, o.top + 11);
+    ctx.moveTo(x, o.top + 13);
     ctx.lineTo(x, o.bottom);
     ctx.stroke();
     ctx.fillStyle = '#7a8195';
-    ctx.fillText('T' + p.n, x, o.top + 1);
+    ctx.fillText(p.n, x, o.top + 1);
   }
   ctx.restore();
 }

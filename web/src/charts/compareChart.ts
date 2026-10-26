@@ -106,7 +106,7 @@ export function drawCompareChart(ctx: CanvasRenderingContext2D, w: number, h: nu
   // corners: at their lap distance, or where the reference (first) driver went through them
   if (byDist && corners.length) {
     ctx.save();
-    ctx.font = `700 9px ${DISPLAY_FONT}`;
+    ctx.font = `700 11px ${DISPLAY_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     let lastLabel = -Infinity;
@@ -115,12 +115,12 @@ export function drawCompareChart(ctx: CanvasRenderingContext2D, w: number, h: nu
       if (x < PAD.l || x > PAD.l + plotW) continue;
       ctx.strokeStyle = 'rgba(236, 238, 243, .07)';
       ctx.beginPath();
-      ctx.moveTo(x, PAD.t + 11);
+      ctx.moveTo(x, PAD.t + 13);
       ctx.lineTo(x, PAD.t + plotH);
       ctx.stroke();
       if (x - lastLabel < 16) continue; // corners this close share one label
       ctx.fillStyle = '#7a8195';
-      ctx.fillText('T' + c.n, x, PAD.t);
+      ctx.fillText(c.n, x, PAD.t);
       lastLabel = x;
     }
     ctx.restore();
@@ -223,7 +223,7 @@ function drawHover(
   }
   // readout box
   const corner = byDist ? cornerAt(corners, key) : null;
-  const title = byDist ? `${Math.round(key)} m${corner ? ' · T' + corner.n : ''}` : `${((now - key) / 1000).toFixed(1)} s ago`;
+  const title = byDist ? `${Math.round(key)} m${corner ? ' · ' + corner.n : ''}` : `${((now - key) / 1000).toFixed(1)} s ago`;
   ctx.font = `600 11px ${DISPLAY_FONT}`;
   const lineH = 15,
     boxW = 190,
