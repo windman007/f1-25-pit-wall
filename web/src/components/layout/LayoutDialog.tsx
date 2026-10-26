@@ -1,8 +1,8 @@
-// Layout dialog: drag sections between columns (or move a focused one with the arrow keys), add or remove
-// columns, then Save. Nothing on the dashboard changes until Save.
+// Layout dialog: drag sections between columns (or move a focused one with the arrow keys), hide or show them,
+// add or remove columns, then Save. Nothing on the dashboard changes until Save.
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {MAX_COLS, moveSection, normalizeArrangement, sameArrangement} from '@shared';
+import {MAX_COLS, moveSection, normalizeArrangement, sameArrangement, toggleHidden} from '@shared';
 import type {Arrangement} from '@shared';
 import {trackPointer, useBodyClass, useEscape} from '../../hooks/dom';
 import {DEFAULT_ARRANGEMENT, SECTION_IDS, saveArrangement, useLayout} from '../../store/layout';
@@ -10,7 +10,7 @@ import {setLayoutOpen, useUi} from '../../store/ui';
 import {SECTIONS} from './Dashboard';
 
 const DRAG_PX = 4; // pointer travel before a press on a section becomes a drag
-const copy = (a: Arrangement): Arrangement => ({cols: a.cols.map(c => [...c])});
+const copy = (a: Arrangement): Arrangement => ({...a, cols: a.cols.map(c => [...c]), ...(a.hidden && {hidden: [...a.hidden]})});
 
 interface Drop {
   col: number;
@@ -99,6 +99,8 @@ function LayoutEditor() {
     move(id, col, index);
   };
 
+  const hidden = draft.hidden ?? [];
+  const visible = draft.cols.flat().length - hidden.length;
   const isDefault = sameArrangement(normalizeArrangement(draft, SECTION_IDS, DEFAULT_ARRANGEMENT), DEFAULT_ARRANGEMENT);
   const save = () => {
     saveArrangement(draft, resetSizes);
@@ -116,7 +118,7 @@ function LayoutEditor() {
         </div>
         <p className="lohint">
           Drag sections between columns to arrange the dashboard; each column stacks its sections top to bottom. With the keyboard: focus a section
-          and use the arrow keys.
+          and use the arrow keys. Hide takes a section off the dashboard; it keeps its place here for when you show it again.
         </p>
         <div className="logrid" ref={grid} style={{'--n': draft.cols.length} as React.CSSProperties}>
           {draft.cols.map((list, ci) => {
@@ -132,7 +134,7 @@ function LayoutEditor() {
                       className="lorm"
                       title="Remove this empty column"
                       aria-label={`Remove column ${ci + 1}`}
-                      onClick={() => setDraft(d => ({cols: d.cols.filter((_, i) => i !== ci)}))}
+                      onClick={() => setDraft(d => ({...d, cols: d.cols.filter((_, i) => i !== ci)}))}
                     >
                       ✕
                     </button>
@@ -142,7 +144,10 @@ function LayoutEditor() {
                   <Tile
                     key={id}
                     id={id}
-                    label={`${SECTIONS[id].title}: column ${ci + 1} of ${draft.cols.length}, position ${k + 1} of ${list.length}. Arrow keys move it.`}
+                    label={`${SECTIONS[id].title}${hidden.includes(id) ? ' (hidden)' : ''}: column ${ci + 1} of ${draft.cols.length}, position ${k + 1} of ${list.length}. Arrow keys move it.`}
+                    hidden={hidden.includes(id)}
+                    lastShown={!hidden.includes(id) && visible === 1}
+                    onToggle={() => setDraft(d => toggleHidden(d, id))}
                     dragging={drag?.id === id}
                     markerBefore={marker >= 0 && others[marker] === id}
                     onPointerDown={e => startDrag(e, id)}
@@ -182,6 +187,10 @@ function LayoutEditor() {
 interface TileProps {
   id: string;
   label: string;
+  hidden: boolean;
+  /** The only section still on show, which cannot be hidden. */
+  lastShown: boolean;
+  onToggle: () => void;
   dragging: boolean;
   /** Show the drop marker just above this tile. */
   markerBefore: boolean;
@@ -189,12 +198,12 @@ interface TileProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-function Tile({id, label, dragging, markerBefore, onPointerDown, onKeyDown}: TileProps) {
+function Tile({id, label, hidden, lastShown, onToggle, dragging, markerBefore, onPointerDown, onKeyDown}: TileProps) {
   return (
     <>
       {markerBefore && <div className="lodrop" />}
       <div
-        className={`lotile${dragging ? ' dragging' : ''}`}
+        className={`lotile${dragging ? ' dragging' : ''}${hidden ? ' off' : ''}`}
         data-id={id}
         tabIndex={0}
         role="button"
@@ -205,6 +214,20 @@ function Tile({id, label, dragging, markerBefore, onPointerDown, onKeyDown}: Til
       >
         <span className="logrip">⋮⋮</span>
         <span className="loname">{SECTIONS[id].title}</span>
+        <button
+          type="button"
+          className="lohide"
+          disabled={lastShown}
+          title={lastShown ? 'At least one section stays on the dashboard' : hidden ? 'Put this section back on the dashboard' : 'Take this section off the dashboard'}
+          aria-label={`${hidden ? 'Show' : 'Hide'} ${SECTIONS[id].title}`}
+          aria-pressed={hidden}
+          // a press on the button is not the start of a drag, and its keys are not moves
+          onPointerDown={e => e.stopPropagation()}
+          onKeyDown={e => e.stopPropagation()}
+          onClick={onToggle}
+        >
+          {hidden ? 'Show' : 'Hide'}
+        </button>
       </div>
     </>
   );

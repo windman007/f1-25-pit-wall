@@ -303,6 +303,29 @@ describe('dashboard arrangement', () => {
     assert.deepEqual(L.moveSection(def, 'd', 0, 99), {cols: [['a', 'b', 'd'], ['c'], ['e']]}, 'an index past the end means last');
     assert.deepEqual(L.moveSection(def, 'd', 0, -3), {cols: [['d', 'a', 'b'], ['c'], ['e']]}, 'below 0 means first');
   });
+  test('hidden sections: known ones only, in page order, never all of them', () => {
+    const out = L.normalizeArrangement({cols: [['e', 'a'], ['b', 'c', 'd']], hidden: ['d', 'zzz', 'a', 'a']}, ids, def);
+    assert.deepEqual(out, {cols: [['e', 'a'], ['b', 'c', 'd']], hidden: ['a', 'd']});
+    assert.deepEqual(L.normalizeArrangement({cols: def.cols, hidden: ids}, ids, def), def, 'all hidden: all shown');
+    for (const bad of [[], 'a', null, 5]) assert.deepEqual(L.normalizeArrangement({cols: def.cols, hidden: bad}, ids, def), def, 'none hidden: no hidden key');
+    assert.deepEqual(L.normalizeArrangement({hidden: ['a']}, ids, def), def, 'no columns: the default, hidden ignored');
+  });
+  test('hiding and showing a section keeps it in place; the last one on show stays', () => {
+    const one = L.toggleHidden(def, 'c');
+    assert.deepEqual(one, {cols: def.cols, hidden: ['c']});
+    assert.notEqual(one.cols[0], def.cols[0]);
+    assert.deepEqual(L.toggleHidden(one, 'c'), def, 'shown again: no hidden key');
+    let arr = def;
+    for (const id of ['a', 'b', 'c', 'd']) arr = L.toggleHidden(arr, id);
+    assert.deepEqual(arr.hidden, ['a', 'b', 'c', 'd']);
+    assert.deepEqual(L.toggleHidden(arr, 'e'), arr, 'the last section on show cannot be hidden');
+    assert.deepEqual(L.toggleHidden(def, 'zzz'), def, 'an unknown section changes nothing');
+    assert.deepEqual(L.moveSection(one, 'c', 0, 0), {cols: [['c', 'a', 'b'], ['d'], ['e']], hidden: ['c']}, 'a hidden section can still be moved');
+  });
+  test('same places: compares the columns only', () => {
+    assert.equal(L.samePlaces(def, L.toggleHidden(def, 'a')), true);
+    assert.equal(L.samePlaces(def, L.moveSection(def, 'a', 1, 0)), false);
+  });
   test('moving keeps empty columns (somewhere to drop while editing) and ignores a missing column', () => {
     const withEmpty = {cols: [['a', 'b'], []]};
     assert.deepEqual(L.moveSection(withEmpty, 'b', 1, 0), {cols: [['a'], ['b']]});
