@@ -88,7 +88,7 @@ describe('building shipped track maps', () => {
   test('the shipped maps are well formed', () => {
     const shipped = path.join(__dirname, '..', 'tracks', 'maps');
     const files = fs.readdirSync(shipped).filter(f => f !== 'boost.json');
-    assert.ok(files.length >= 17, files.join(','));
+    assert.ok(files.length >= 22, files.join(','));
     for (const f of files) {
       const map = JSON.parse(fs.readFileSync(path.join(shipped, f), 'utf8'));
       const [id, len] = [map.trackId, map.trackLength];
@@ -106,7 +106,7 @@ describe('building shipped track maps', () => {
 describe('shipped overtake detection points', () => {
   test('lap distances inside the lap, for tracks given as <trackId>-<trackLength>', () => {
     const boost = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tracks', 'maps', 'boost.json'), 'utf8'));
-    assert.ok(Object.keys(boost).length >= 16);
+    assert.ok(Object.keys(boost).length >= 21);
     for (const [key, m] of Object.entries(boost)) {
       const [id, len] = key.split('-').map(Number);
       assert.ok(Number.isInteger(id) && len > 0, key);
