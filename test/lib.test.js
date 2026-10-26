@@ -274,6 +274,28 @@ describe('per-car history', () => {
   });
 });
 
+describe('recording names', () => {
+  const at = new Date(2026, 9, 26, 22, 36, 31); // local time: 26 Oct 2026, 22:36:31
+  test('date and time, then track, session and game format', () => {
+    assert.equal(L.recordingName(at, {track: 'Silverstone', sessionType: 18, packetFormat: 2026}), '2026-10-26_22-36-31_Silverstone_Time-Trial_F1-26');
+    assert.equal(L.recordingName(new Date(2026, 0, 2, 3, 4, 5), {track: 'Spa', sessionType: 15, packetFormat: 2025}), '2026-01-02_03-04-05_Spa_Race_F1-25');
+  });
+  test('names are letters, digits and dashes: spaces and accents are tidied', () => {
+    assert.equal(L.recordingName(at, {track: 'Abu Dhabi', sessionType: 9, packetFormat: 2026}), '2026-10-26_22-36-31_Abu-Dhabi_One-Shot-Qualifying_F1-26');
+    assert.equal(L.recordingName(at, {track: 'Portimão', sessionType: 1, packetFormat: 2025}), '2026-10-26_22-36-31_Portimao_Practice-1_F1-25');
+    assert.equal(L.recordingName(at, {track: ' ../Sakhir  Short/ ', sessionType: 15, packetFormat: 2026}), '2026-10-26_22-36-31_Sakhir-Short_Race_F1-26');
+  });
+  test('only what is known is in the name', () => {
+    assert.equal(L.recordingName(at), '2026-10-26_22-36-31');
+    assert.equal(L.recordingName(at, null), '2026-10-26_22-36-31');
+    assert.equal(L.recordingName(at, {track: 'Monza'}), '2026-10-26_22-36-31_Monza');
+    assert.equal(L.recordingName(at, {track: 'Monza', sessionType: 99, packetFormat: 0}), '2026-10-26_22-36-31_Monza', 'a session type the game does not have');
+    assert.equal(L.recordingName(at, {track: '', sessionType: 15}), '2026-10-26_22-36-31_Race');
+    assert.equal(L.sessionName(18), 'Time Trial');
+    assert.equal(L.sessionName(null), '');
+  });
+});
+
 describe('dashboard arrangement', () => {
   const ids = ['a', 'b', 'c', 'd', 'e'];
   const def = {cols: [['a', 'b'], ['c', 'd'], ['e']]};

@@ -42,7 +42,7 @@ Switch the chart to **lap distance** to line the drivers up corner by corner, he
 
 ### Replay
 
-Recordings are written to `recordings/` (git-ignored). Open the list from the header's **Replays** button (or the waiting screen), pick one, and it plays in a new tab:
+Recordings are written to `recordings/` (git-ignored), named after what they hold, e.g. `2026-10-26_22-36-31_Silverstone_Time-Trial_F1-26.f1rec` (local start time, track, session, game format). Recordings made with the old `session-<time>.f1rec` names can be renamed the same way with `npm run recordings:rename` (add `-- --dry-run` to only see the new names). Open the list from the header's **Replays** button (or the waiting screen), pick one, and it plays in a new tab:
 
 ![Saved replays](docs/replays.png?v=3)
 
