@@ -1,8 +1,9 @@
-// How the dashboard is laid out: which sections sit in which column (arranged in the Layout dialog), and the
+// How the dashboard is laid out: which sections sit in which column and which are hidden (both set in the Layout
+// dialog), and the
 // sizes set by dragging the dividers, kept as flex weights (px at drag time) so they scale with the window.
 // Both are remembered in localStorage.
 import {create} from 'zustand';
-import {normalizeArrangement, sameArrangement} from '@shared';
+import {normalizeArrangement, sameArrangement, samePlaces} from '@shared';
 import type {Arrangement} from '@shared';
 import {KEYS, readJson, write} from '../storage';
 
@@ -37,13 +38,13 @@ export function setSizes(update: Sizes, persist = false) {
 }
 
 /**
- * Lays the dashboard out in a new arrangement. A different arrangement (or resetSizes) starts from even sizes:
- * weights saved for the old columns would no longer fit.
+ * Lays the dashboard out in a new arrangement. Sections in different places (or resetSizes) start from even sizes:
+ * weights saved for the old columns would no longer fit. Only hiding or showing sections keeps them.
  */
 export function saveArrangement(draft: Arrangement, resetSizes: boolean) {
   const next = normalizeArrangement(draft, SECTION_IDS, DEFAULT_ARRANGEMENT);
   const {arrangement, sizes} = useLayout.getState();
-  const changed = !sameArrangement(next, arrangement);
+  const changed = !samePlaces(next, arrangement);
   write(KEYS.arrangement, sameArrangement(next, DEFAULT_ARRANGEMENT) ? null : next);
   if (changed || resetSizes) write(KEYS.sizes, null);
   useLayout.setState({arrangement: next, sizes: changed || resetSizes ? {} : sizes});

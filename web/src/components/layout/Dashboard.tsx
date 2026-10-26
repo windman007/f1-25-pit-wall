@@ -1,5 +1,7 @@
 // The dashboard: columns c1..cN of sections as arranged in the Layout dialog, with dividers between columns and
-// between the sections of a column. On narrow screens the sections stack, in the same order, at natural size.
+// between the sections of a column. Hidden sections are left out, and so is a column with nothing left to show
+// (the others keep their ids, so sizes saved for them still apply). On narrow screens the sections stack, in the
+// same order, at natural size.
 import {Fragment, type ComponentType} from 'react';
 import {useDesktop} from '../../hooks/dom';
 import {useLayout, type Sizes} from '../../store/layout';
@@ -30,10 +32,11 @@ const flex = (sizes: Sizes, id: string, desktop: boolean) => (desktop && sizes[i
 export function Dashboard() {
   const desktop = useDesktop();
   const {arrangement, sizes} = useLayout();
+  const hidden = arrangement.hidden ?? [];
+  const cols = arrangement.cols.map((list, i) => ({colId: `c${i + 1}`, list: list.filter(id => !hidden.includes(id))})).filter(c => c.list.length);
   return (
     <main>
-      {arrangement.cols.map((list, i) => {
-        const colId = `c${i + 1}`;
+      {cols.map(({colId, list}, i) => {
         return (
           <Fragment key={colId}>
             {i > 0 && <Splitter dir="x" />}

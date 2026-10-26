@@ -736,6 +736,13 @@ body.replaying .conntext { color: var(--amber); }
 .lotile:hover, .lotile:focus-visible { border-color: var(--amber); }
 .lotile:focus-visible { box-shadow: 0 0 0 2px rgba(255, 176, 32, .35); }
 .lotile.dragging { opacity: .35; }
+.lotile.off { border-style: dashed; background: transparent; }
+.lotile.off .loname { color: var(--faint); text-decoration: line-through; }
+.lohide { margin-left: auto; font: 600 11px var(--f-ui); letter-spacing: .04em; text-transform: none; color: var(--dim); background: transparent;
+  border: 1px solid var(--line2); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+.lohide:hover:not(:disabled), .lohide:focus-visible { color: var(--text); border-color: var(--amber); outline: none; }
+.lohide:disabled { opacity: .35; cursor: default; }
+.lotile.off .lohide { color: var(--amber); border-color: rgba(255, 176, 32, .45); }
 .logrip { color: var(--faint); letter-spacing: -2px; }
 .loempty { flex: 1; display: grid; place-items: center; text-align: center; padding: 12px; font-size: 12px; color: var(--faint); }
 .lodrop { height: 3px; border-radius: 3px; background: var(--amber); box-shadow: 0 0 10px var(--amber); }

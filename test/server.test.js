@@ -417,7 +417,8 @@ describe('replay mode', () => {
   });
 
   test('command line: --replay needs a file, and rejects a bad one', () => {
-    const run = args => require('child_process').spawnSync(process.execPath, [path.join(ROOT, 'server.js'), ...args], {encoding: 'utf8', env: {...process.env, PORT: '0', UDP_PORT: '0'}});
+    const run = args =>
+      require('child_process').spawnSync(process.execPath, [path.join(ROOT, 'server.js'), ...args], {encoding: 'utf8', timeout: 10000, env: {...process.env, PORT: '0', UDP_PORT: '0'}});
     assert.match(run(['--replay']).stderr, /Usage: node server.js --replay/);
     assert.equal(run(['--replay']).status, 1);
     const bad = run(['--replay', path.join(ROOT, 'package.json')]);
@@ -893,31 +894,38 @@ describe('running server', () => {
 });
 
 describe('command line', () => {
-  // starts `node server.js` on a random port, returns the process, its output so far and the port
+  // Every server started here is killed after the run, even when a test fails: a live child would keep the
+  // test run from ever exiting.
+  const children = [];
+  after(() => children.forEach(c => c.exitCode === null && c.signalCode === null && c.kill('SIGKILL')));
+
+  // starts `node server.js` on free ports (PORT=0), returns the process, its output so far and its HTTP port
   async function launch(args, env = {}) {
-    const port = 30000 + Math.floor(Math.random() * 20000);
     const child = spawn(process.execPath, [path.join(ROOT, 'server.js'), ...args], {
-      env: {...process.env, PORT: String(port), UDP_PORT: String(port + 1), PUBLIC_DIR: builtPage(), ...env},
+      env: {...process.env, PORT: '0', UDP_PORT: '0', PUBLIC_DIR: builtPage(), ...env},
     });
+    children.push(child);
     const out = {text: ''};
     child.stdout.on('data', c => (out.text += c));
     await until(() => out.text.includes('Dashboard:'), 5000);
-    return {child, out, port};
+    return {child, out, port: Number(out.text.match(/Dashboard: http:\/\/localhost:(\d+)/)[1])};
   }
   const exited = child => new Promise(r => child.on('exit', code => r(code)));
 
   test('demo mode serves the page and stops cleanly on Ctrl+C', async () => {
     const {child, out, port} = await launch(['--demo']);
-    assert.match(out.text, /Demo mode/);
+    assert.notEqual(port, 3000, 'PORT=0 means any free port, not the default');
+    await until(() => out.text.includes('Demo mode'), 5000); // a line of its own: it can arrive after 'Dashboard:'
     assert.equal((await get(port, '/')).status, 200);
     child.kill('SIGINT');
     assert.equal(await exited(child), 0);
   });
 
   test('live mode listens on UDP_PORT', async () => {
-    const {child, out, port} = await launch([]);
+    const {child, out} = await launch([]);
     await until(() => out.text.includes('Listening for F1 UDP telemetry'), 5000);
-    assert.match(out.text, new RegExp(`port ${port + 1}`));
+    const udp = Number(out.text.match(/telemetry on port (\d+)/)[1]);
+    assert.ok(udp > 0 && udp !== 20777, `UDP_PORT=0 means any free port, not the default: ${udp}`);
     child.kill('SIGINT');
     assert.equal(await exited(child), 0);
   });

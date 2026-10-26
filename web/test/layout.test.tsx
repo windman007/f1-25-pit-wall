@@ -280,6 +280,66 @@ describe('layout dialog', () => {
   });
 });
 
+describe('hiding sections', () => {
+  const hideBtn = (p: Page, id: string) => tile(p, id).querySelector<HTMLButtonElement>('.lohide')!;
+  test('Hide takes a section off the dashboard on Save, keeping its place and the sizes', async () => {
+    const p = await page({storage: {[KEY]: JSON.stringify({c1: 500, 'p-lap': 300})}});
+    p.click('.layoutbtn');
+    p.click(hideBtn(p, 'p-tyres'));
+    expect(tile(p, 'p-tyres').classList.contains('off')).toBe(true);
+    expect(hideBtn(p, 'p-tyres').textContent).toBe('Show');
+    expect(hideBtn(p, 'p-tyres').getAttribute('aria-label')).toBe('Show Tyres & car');
+    expect(tile(p, 'p-tyres').getAttribute('aria-label')).toMatch(/^Tyres & car \(hidden\): column 1/);
+    expect(dialogCols(p), 'still in its place').toEqual(DEFAULT);
+    expect(dashboard(), 'nothing changes before Save').toEqual(DEFAULT);
+    p.click('.lobtn.save');
+    expect(dashboard()).toEqual([['p-driving'], ['p-lap', 'p-map'], ['p-standings', 'p-strategy']]);
+    expect(el('p-tyres')).toBeNull();
+    expect(JSON.parse(localStorage.getItem(ARRANGE)!)).toEqual({cols: DEFAULT, hidden: ['p-tyres']});
+    expect(weight('c1'), 'only hiding: sizes kept').toBe(500);
+    expect(weight('p-lap')).toBe(300);
+  });
+  test('a column with everything hidden is left out; the rest keep their ids', async () => {
+    const p = await page({storage: {[ARRANGE]: JSON.stringify({cols: DEFAULT, hidden: ['p-lap', 'p-map']})}});
+    expect(dashboard()).toEqual([['p-driving', 'p-tyres'], ['p-standings', 'p-strategy']]);
+    expect(mainKids()).toEqual(['c1', 'split-x', 'c3']);
+    p.click('.layoutbtn');
+    expect(p.$$('.lotile.off').map(t => t.dataset.id)).toEqual(['p-lap', 'p-map']);
+  });
+  test('Show puts it back where it was', async () => {
+    const p = await page({storage: {[ARRANGE]: JSON.stringify({cols: DEFAULT, hidden: ['p-map']})}});
+    p.click('.layoutbtn');
+    p.click(hideBtn(p, 'p-map'));
+    expect(p.$$('.lotile.off')).toEqual([]);
+    p.click('.lobtn.save');
+    expect(dashboard()).toEqual(DEFAULT);
+    expect(localStorage.getItem(ARRANGE), 'back to the default').toBeNull();
+  });
+  test('the last section on show cannot be hidden', async () => {
+    const p = await page();
+    p.click('.layoutbtn');
+    for (const id of DEFAULT.flat().slice(0, -1)) p.click(hideBtn(p, id));
+    expect(hideBtn(p, 'p-strategy').disabled).toBe(true);
+    expect(hideBtn(p, 'p-driving').disabled, 'hidden ones can be shown').toBe(false);
+    p.click('.lobtn.save');
+    expect(dashboard()).toEqual([['p-strategy']]);
+  });
+  test('the Hide button neither drags nor moves the section; Default layout shows everything', async () => {
+    const p = await page();
+    p.click('.layoutbtn');
+    stubDialog(p);
+    p.pointer(hideBtn(p, 'p-driving'), 'pointerdown', {clientX: 10, clientY: 60});
+    p.pointer(hideBtn(p, 'p-driving'), 'pointermove', {clientX: 410, clientY: 60});
+    expect(p.$('.loghost'), 'no drag').toBeNull();
+    p.key(hideBtn(p, 'p-driving'), 'ArrowRight');
+    expect(dialogCols(p), 'no move').toEqual(DEFAULT);
+    p.click(hideBtn(p, 'p-driving'));
+    expect(p.$<HTMLButtonElement>('.lodefault')!.disabled, 'a hidden section is not the default').toBe(false);
+    p.click('.lodefault');
+    expect(p.$$('.lotile.off')).toEqual([]);
+  });
+});
+
 describe('saved layout', () => {
   test('a saved arrangement is laid out on load, with working dividers', async () => {
     const custom = {cols: [['p-map', 'p-standings', 'p-lap'], ['p-driving', 'p-tyres', 'p-strategy']]};
