@@ -747,6 +747,36 @@ describe('recording', () => {
     assert.ok(rec.packets.every((p, i) => p.buf.equals(packets[i].buf)));
     await d.stopRecording(); // not recording: no-op
   });
+  test('the file is named after when it started and what the game has said it is', async () => {
+    const f26 = require('./f1-2026');
+    const dir = tmpDir();
+    const d = offline({recDir: dir});
+    d.startRecording();
+    const before = path.basename(d.recordingState().file);
+    assert.match(before, /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d\.f1rec$/, 'no session yet: just the date and time');
+    await d.stopRecording();
+    d.handlePacket(f26.build('session')); // Madrid, a race, format 2026
+    d.startRecording();
+    const named = path.basename(d.recordingState().file);
+    assert.match(named, /^\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_Madrid_Race_F1-26\.f1rec$/);
+    await d.stopRecording();
+    assert.deepEqual(fs.readdirSync(dir).sort(), [before, named].sort());
+  });
+  test('a recording never takes the name of an older one', async () => {
+    const f26 = require('./f1-2026');
+    const dir = tmpDir();
+    const d = offline({recDir: dir});
+    d.handlePacket(f26.build('session'));
+    const names = [];
+    for (let i = 0; i < 3; i++) { // three starts in the same second
+      d.startRecording();
+      names.push(path.basename(d.recordingState().file));
+      await d.stopRecording();
+    }
+    assert.equal(new Set(names).size, 3);
+    assert.equal(fs.readdirSync(dir).length, 3);
+    assert.ok(names.every(n => n.endsWith('_Madrid_Race_F1-26.f1rec') || /_Madrid_Race_F1-26-\d\.f1rec$/.test(n)), names.join());
+  });
   test('the record message stops a recording', async () => {
     const d = offline();
     d.handleClientMessage({}, JSON.stringify({record: true}));

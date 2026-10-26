@@ -6,7 +6,7 @@ const {WebSocketServer} = require('ws');
 const {F1TelemetryClient, constants} = require('./build/src');
 const {StrategyTracker} = require('./strategy');
 const {loadRecording, createPlayer, createRecordingWriter, readHeader, isRecordingName, REC_EXT, HEADER_BYTES} = require('./replay');
-const {overtakeOn, createHistory, recordHistory, historySnapshot, learnTrack, outlineComplete, outlinePoints, fitCorners} = require('./build/shared');
+const {overtakeOn, createHistory, recordHistory, historySnapshot, learnTrack, outlineComplete, outlinePoints, fitCorners, recordingName} = require('./build/shared');
 
 const {PACKETS, TRACKS, TEAMS} = constants;
 // the React page, built by `npm run build:web` (web/ -> web/dist)
@@ -300,7 +300,10 @@ function createDashboard(options = {}) {
   function startRecording() {
     if (rec.stream || demo) return;
     fs.mkdirSync(recDir, {recursive: true});
-    const name = `session-${new Date().toISOString().replace(/[:.]/g, '-')}${REC_EXT}`;
+    // what the game has told us so far: track, session type and format ('2026-10-26_22-36-31_Silverstone_Time-Trial_F1-26.f1rec')
+    const base = recordingName(new Date(), state.session);
+    let name = base + REC_EXT;
+    for (let n = 2; fs.existsSync(path.join(recDir, name)); n++) name = `${base}-${n}${REC_EXT}`; // never over an older one
     rec.file = path.join(recDir, name);
     rec.startedAt = Date.now();
     rec.packets = 0;

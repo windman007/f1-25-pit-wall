@@ -1,5 +1,5 @@
 // Replays a recording made by the dashboard's REC button to the local UDP port, with original timing.
-// Usage: node replay.js recordings/session-<time>.f1rec [--speed 2] [--port 20777] [--host 127.0.0.1] [--loop]
+// Usage: node replay.js recordings/<file>.f1rec [--speed 2] [--port 20777] [--host 127.0.0.1] [--loop]
 const fs = require('fs');
 const dgram = require('dgram');
 const zlib = require('zlib');

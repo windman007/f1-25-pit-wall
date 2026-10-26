@@ -81,6 +81,8 @@ const SESSION_NAMES: Record<number, string> = {
   8: 'Short Qualifying', 9: 'One-Shot Qualifying', 10: 'Sprint Shootout 1', 11: 'Sprint Shootout 2', 12: 'Sprint Shootout 3',
   13: 'Short Sprint Shootout', 14: 'One-Shot Sprint Shootout', 15: 'Race', 16: 'Race 2', 17: 'Race 3', 18: 'Time Trial',
 };
+/** The session's name ('Time Trial', 'Race'), or '' for a type the game doesn't have. */
+export const sessionName = (sessionType: number | null | undefined): string => SESSION_NAMES[sessionType as number] || '';
 /** Header text for the session: its name, the lap (of the total in a race) and the time left when it is timed. */
 export function sessionLabel(
   se: Pick<Session, 'sessionType'> & Partial<Pick<Session, 'totalLaps' | 'timeLeft'>> | null | undefined,
