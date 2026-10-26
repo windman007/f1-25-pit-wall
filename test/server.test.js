@@ -945,15 +945,16 @@ describe('session time', () => {
 
 describe('overtake detection point', () => {
   const f26 = require('./f1-2026');
-  // the player is car 0: its lap distance (lap data) and its overtake countdown (car telemetry 2)
-  const LAP_DISTANCE = 29 + 20, COUNTDOWN = 29 + 6, REGS_2026 = 29 + 8;
+  // a car's lap distance (lap data: 57 bytes a car after the 29 byte header) and its overtake countdown (car
+  // telemetry 2: 10 bytes a car); the player is car 0. The other cars have no countdown running.
+  const LAP_DISTANCE = car => 29 + car * 57 + 20, COUNTDOWN = car => 29 + car * 10 + 6, REGS_2026 = car => 29 + car * 10 + 8;
   const KEY = '42-5476'; // the 2026 test session: Madrid, 5476 m
-  function drive(d, dist, left, {regs = 1} = {}) {
+  function drive(d, dist, left, {regs = 1, car = 0} = {}) {
     const lap = f26.build('lapData');
-    lap.writeFloatLE(dist, LAP_DISTANCE);
+    lap.writeFloatLE(dist, LAP_DISTANCE(car));
     const t2 = f26.build('carTelemetry2');
-    t2.writeUInt16LE(left, COUNTDOWN);
-    t2[REGS_2026] = regs;
+    for (let c = 0; c < f26.CARS; c++) t2.writeUInt16LE(c === car ? left : 0, COUNTDOWN(c));
+    t2[REGS_2026(car)] = regs;
     d.handlePacket(lap);
     d.handlePacket(t2);
   }
@@ -987,6 +988,10 @@ describe('overtake detection point', () => {
     drive(d, -300, 299); // before the start line
     drive(d, -200, 199);
     drive(d, -10, 0);
+    drive(d, 5, 290); // began 5 m before the line: the race start or a pit exit
+    drive(d, 50, 0);
+    drive(d, 2500, 400); // not a countdown the game would run
+    drive(d, 2500, 0);
     drive(d, 2000, 0, {regs: 0});
     drive(d, 2100, 300, {regs: 0}); // a car without the 2026 rules
     drive(d, 2200, 0);
@@ -996,11 +1001,17 @@ describe('overtake detection point', () => {
     assert.equal(d.refreshState().trackMap.boost, 3000);
   });
 
-  test('a countdown that started just before the line is placed at the end of the lap', () => {
-    const {d} = session();
-    drive(d, 0, 0);
-    drive(d, 4, 290); // 10 m in, 4 m past the line: 6 m before it
-    assert.equal(d.refreshState().trackMap.boost, 5470);
+  test('any car\'s countdown does: a rival\'s, with the player in the pits or no player at all', () => {
+    const {d, trackDir} = session();
+    drive(d, 2100, 297, {car: 5}); // car 5 is 3 m into it
+    assert.equal(d.refreshState().trackMap.boost, 2097);
+    assert.deepEqual(saved(trackDir), {[KEY]: 2097});
+    const {d: e} = session();
+    drive(e, 3000, 300, {car: 23});
+    assert.equal(e.refreshState().trackMap.boost, 3000);
+    const {d: f} = session();
+    drive(f, 5, 290, {car: 3}); // 10 m in, only 5 m past the line: began before it, so not a detection point
+    assert.equal(f.refreshState().trackMap.boost, null);
   });
 
   test('a shipped detection point is used at once; a learned one wins over it; neither is learned again', () => {

@@ -563,12 +563,13 @@ function createDashboard(options = {}) {
     outlines.found.set(key, {file, at: Date.now()});
     return file;
   }
-  // --- Overtake detection point (format 2026): each lap the game starts a 300 m countdown to overtake mode for the
-  // player's car at the same spot on the track, and that spot is the detection point. It is learned from the
-  // first countdown seen on a track and kept as lap distance in <trackDir>/boost.json ({"<trackId>-<trackLength>": m});
-  // boost.json next to the shipped maps holds the ones shipped, see scripts/build-tracks.js ---
+  // --- Overtake detection point (format 2026): each lap the game starts a 300 m countdown to overtake mode for every
+  // car at the same spot on the track, and that spot is the detection point. It is learned from the first
+  // countdown seen on a track, whichever car it is, and kept as lap distance in <trackDir>/boost.json
+  // ({"<trackId>-<trackLength>": m}); boost.json next to the shipped maps holds the ones shipped, see
+  // scripts/build-tracks.js ---
   const BOOST_COUNTDOWN_M = 300;
-  const boosts = {data: null, left: 0};
+  const boosts = {data: null, left: []}; // left: per car, the countdown as last seen
   const readBoosts = () => {
     if (!boosts.data) {
       boosts.data = {};
@@ -583,14 +584,19 @@ function createDashboard(options = {}) {
     return boosts.data;
   };
   function learnBoost() {
-    const t2 = state.telemetry2, se = state.session, key = demo ? null : trackKey(se);
-    const left = t2 && t2.m_2026Regulations ? t2.m_overtakeActivationDistance : 0;
-    // a countdown that starts: the first reading is (nearly) the full 300 m, not one joined half way
-    const starts = !boosts.left && left >= BOOST_COUNTDOWN_M - 20;
-    boosts.left = left;
-    const dist = state.lap && state.lap.m_lapDistance;
-    if (!starts || !key || !(dist >= 0) || readBoosts()[key] != null) return;
-    const at = Math.round((((dist - (BOOST_COUNTDOWN_M - left)) % se.trackLength) + se.trackLength) % se.trackLength);
+    const se = state.session, key = demo ? null : trackKey(se);
+    if (!raw.tel2) return;
+    let at = null;
+    raw.tel2.forEach((t2, car) => {
+      const left = t2.m_2026Regulations ? t2.m_overtakeActivationDistance : 0;
+      // a countdown that starts: the first reading is (nearly) the full 300 m, not one joined half way
+      const starts = !boosts.left[car] && left >= BOOST_COUNTDOWN_M - 20 && left <= BOOST_COUNTDOWN_M;
+      boosts.left[car] = left;
+      const dist = raw.lap && raw.lap[car] ? raw.lap[car].m_lapDistance : -1;
+      // one that began before the start line is the race start or a pit exit, not a detection point
+      if (starts && at == null && dist - (BOOST_COUNTDOWN_M - left) >= 0) at = Math.round(dist - (BOOST_COUNTDOWN_M - left));
+    });
+    if (at == null || !key || readBoosts()[key] != null) return;
     readBoosts()[key] = at;
     if (state.trackMap) state.trackMap.boost = at;
     try {

@@ -97,7 +97,7 @@ describe('building shipped track maps', () => {
 describe('shipped overtake detection points', () => {
   test('lap distances inside the lap, for tracks given as <trackId>-<trackLength>', () => {
     const boost = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'tracks', 'maps', 'boost.json'), 'utf8'));
-    assert.ok(Object.keys(boost).length >= 7);
+    assert.ok(Object.keys(boost).length >= 11);
     for (const [key, m] of Object.entries(boost)) {
       const [id, len] = key.split('-').map(Number);
       assert.ok(Number.isInteger(id) && len > 0, key);
